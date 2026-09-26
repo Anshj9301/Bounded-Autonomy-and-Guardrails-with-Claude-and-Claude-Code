@@ -1,0 +1,352 @@
+{
+  "pullRequest": {
+    "owner": "lucaong",
+    "repo": "minisearch",
+    "number": 295
+  },
+  "fileReviews": [
+    {
+      "file": "src/MiniSearch.ts",
+      "codeQuality": {
+        "file": "src/MiniSearch.ts",
+        "issues": [
+          {
+            "line": 1710,
+            "severity": "high",
+            "category": "bug-risk",
+            "description": "Critical bug in weights destructuring logic: If weights object is provided but fuzzy or prefix is set to 0 (a valid weight value), the code will incorrectly fall back to default values due to the || {} pattern. This means users cannot set fuzzy or prefix weights to 0.",
+            "suggestion": "Use nullish coalescing and proper default parameter syntax: const { fuzzy: fuzzyWeight = defaultSearchOptions.weights.fuzzy, prefix: prefixWeight = defaultSearchOptions.weights.prefix } = weights ?? {}. This ensures only null/undefined trigger defaults, not the number 0."
+          },
+          {
+            "line": 1710,
+            "severity": "medium",
+            "category": "maintainability",
+            "description": "Unsafe destructuring with fallback to defaultSearchOptions at lines 1709-1712. If 'weights' is provided but one of its properties (fuzzy/prefix) is explicitly set to 0 or false, the fallback logic will incorrectly use default values instead of the provided value.",
+            "suggestion": "Use nullish coalescing (??) instead of logical OR (||) to handle only null/undefined cases, not falsy values like 0. Replace with: const { fuzzy: fuzzyWeight = defaultSearchOptions.weights.fuzzy, prefix: prefixWeight = defaultSearchOptions.weights.prefix } = weights ?? {}"
+          },
+          {
+            "line": 54,
+            "severity": "medium",
+            "category": "best-practice",
+            "description": "The weights type definition allows fuzzy and prefix to be optional with default values documented via @default tags, but TypeScript cannot enforce these defaults. This creates a discrepancy between documentation and runtime behavior.",
+            "suggestion": "Consider making the weights property non-optional in SearchOptionsWithDefaults (line 186) to ensure type safety matches runtime expectations. The current implementation at line 1712 falls back to defaults correctly, but the type system doesn't reflect this guarantee."
+          },
+          {
+            "line": 2157,
+            "severity": "medium",
+            "category": "security",
+            "description": "The default extractField function uses bracket notation to access arbitrary properties from user-supplied documents without validation. While not directly exploitable, this could lead to prototype pollution if combined with malicious documents containing __proto__ or constructor properties.",
+            "suggestion": "Use hasOwnProperty check or Object.prototype.hasOwnProperty.call() before accessing properties, similar to the getOwnProperty helper at line 2041. Example: extractField: (document: any, fieldName: string) => Object.prototype.hasOwnProperty.call(document, fieldName) ? document[fieldName] : undefined"
+          },
+          {
+            "line": 1699,
+            "severity": "medium",
+            "category": "performance",
+            "description": "The boosts object is recreated via reduce operation on every query execution, even for repeated searches with the same options. For large field arrays, this creates unnecessary object allocation overhead.",
+            "suggestion": "Cache the boosts object when options haven't changed, or compute it once during options normalization. Consider memoizing based on options.fields and options.boost to avoid recomputation."
+          },
+          {
+            "line": 2190,
+            "severity": "medium",
+            "category": "performance",
+            "description": "assignUniqueTerm uses Array.includes() which has O(n) complexity. For queries with many terms, this can become a performance bottleneck since includes() searches the entire array on each call.",
+            "suggestion": "Use a Set to track unique terms, then convert to array at the end. Example: const termsSet = new Set(terms); termsSet.add(term); terms = Array.from(termsSet). Alternatively, maintain a Set alongside the array if both are needed."
+          },
+          {
+            "line": 2195,
+            "severity": "medium",
+            "category": "performance",
+            "description": "assignUniqueTerms repeatedly calls Array.includes() in a loop, resulting in O(n*m) complexity where n is source length and m is target length. This is inefficient for large term arrays.",
+            "suggestion": "Convert target to a Set for O(1) lookups, perform the additions, then convert back to array if needed. Example: const targetSet = new Set(target); for (const term of source) targetSet.add(term); target.splice(0, target.length, ...targetSet);"
+          },
+          {
+            "line": 938,
+            "severity": "low",
+            "category": "maintainability",
+            "description": "Use of semicolon prefix pattern (void operator pattern) at line 938: ;(this._fieldLength.get(shortId) || []). While technically correct, this is an outdated pattern that can confuse modern developers.",
+            "suggestion": "Remove the leading semicolon and use standard syntax. The previous line already ends with a semicolon, making this unnecessary. Replace with: (this._fieldLength.get(shortId) || []).forEach(...)"
+          },
+          {
+            "line": 2163,
+            "severity": "low",
+            "category": "security",
+            "description": "The default logger uses optional chaining to access console methods but doesn't validate the level parameter. An attacker could potentially cause unexpected behavior by passing malicious level values, though impact is limited to logging.",
+            "suggestion": "Validate the level parameter against allowed values before using it: const validLevels = ['debug', 'info', 'warn', 'error']; if (validLevels.includes(level) && typeof console?.[level] === 'function') console[level](message)"
+          },
+          {
+            "line": 1970,
+            "severity": "low",
+            "category": "performance",
+            "description": "warnDocumentChanged iterates through all field names using Object.keys() on every invocation. For indexes with many fields, this is inefficient, especially since the method is called during error conditions.",
+            "suggestion": "Create a reverse lookup map from fieldId to fieldName during initialization to enable O(1) lookups instead of O(n) iteration. Store it as _fieldNames: Map<number, string> and populate it in addFields()."
+          },
+          {
+            "line": 740,
+            "severity": "low",
+            "category": "security",
+            "description": "Calling toString() on fieldValue without validation could potentially trigger custom toString methods on malicious objects, leading to unexpected behavior or information disclosure.",
+            "suggestion": "Use String() constructor instead of toString() method to safely convert values: const tokens = tokenize(String(fieldValue), field). This prevents calling potentially malicious custom toString implementations."
+          },
+          {
+            "line": 869,
+            "severity": "low",
+            "category": "maintainability",
+            "description": "removeAll() checks arguments.length explicitly to distinguish between removeAll() and removeAll(undefined). This is fragile and could be confusing to users of the API.",
+            "suggestion": "Consider using a more explicit pattern, such as a separate method or checking for the exact undefined value: if (documents !== undefined) instead of checking arguments.length. Alternatively, document this behavior clearly with TypeScript overload signatures."
+          }
+        ],
+        "overallScore": 78,
+        "summary": "The code is generally well-structured and follows TypeScript best practices, but has several notable issues. Critical Finding: Lines 1709-1712 contain a bug in weights destructuring that prevents users from setting fuzzy/prefix weights to 0 due to incorrect use of || operator instead of ?? (nullish coalescing). This affects the PR changes specifically. Security concerns include default extractField function lacking prototype pollution protection and potential for triggering malicious toString() implementations. Performance issues include inefficient use of Array.includes() for term uniqueness checks, unnecessary object recreation on every query, and linear search through field names. The most critical issue is the weights destructuring bug introduced in the PR changes, which should be fixed before merging."
+      },
+      "testCoverage": {
+        "file": "src/MiniSearch.ts",
+        "hasTests": false,
+        "testFiles": [],
+        "untestedPaths": [
+          {
+            "type": "branch",
+            "location": "Lines 52-61: SearchOptions.weights (partial type with optional fuzzy and prefix)",
+            "priority": "high",
+            "reasoning": "The new type definition allows optional fuzzy and prefix properties in weights. This change enables partial specification of weights, which must be tested to ensure default values are properly applied when properties are omitted.",
+            "suggestedTest": "should handle search with partial weights object containing only fuzzy property: const result = miniSearch.search('test', { weights: { fuzzy: 0.3 } }); expect result to use fuzzy weight of 0.3 and default prefix weight of 0.375"
+          },
+          {
+            "type": "branch",
+            "location": "Lines 52-61: SearchOptions.weights (partial type with optional prefix)",
+            "priority": "high",
+            "reasoning": "Testing with only prefix specified ensures the fuzzy default is correctly applied.",
+            "suggestedTest": "should handle search with partial weights object containing only prefix property: const result = miniSearch.search('test', { weights: { prefix: 0.5 } }); expect result to use prefix weight of 0.5 and default fuzzy weight of 0.45"
+          },
+          {
+            "type": "edge-case",
+            "location": "Lines 52-61: SearchOptions.weights (empty object)",
+            "priority": "high",
+            "reasoning": "With optional properties, an empty weights object {} is now valid. This edge case must be tested to ensure defaults from defaultSearchOptions.weights are applied correctly.",
+            "suggestedTest": "should handle search with empty weights object: const result = miniSearch.search('test', { weights: {} }); expect result to use default fuzzy weight of 0.45 and default prefix weight of 0.375"
+          },
+          {
+            "type": "branch",
+            "location": "Lines 1709-1712: executeQuerySpec - weights destructuring with undefined weights",
+            "priority": "critical",
+            "reasoning": "The new destructuring code handles the case where options.weights is undefined by falling back to defaults. This is a critical code path that affects scoring for all searches where weights are not specified.",
+            "suggestedTest": "should apply default fuzzy weight when weights object is undefined: const result = miniSearch.search('test', { fuzzy: 0.2, prefix: true }); verify that fuzzy and prefix matches use defaultSearchOptions.weights.fuzzy (0.45) and .prefix (0.375) respectively"
+          },
+          {
+            "type": "branch",
+            "location": "Lines 1709-1712: executeQuerySpec - weights destructuring with partial weights",
+            "priority": "critical",
+            "reasoning": "Tests the || {} fallback and individual property defaults. The destructuring with defaults must correctly handle partial weights objects.",
+            "suggestedTest": "should apply default prefix weight when weights.prefix is undefined: const result = miniSearch.search('test', { weights: { fuzzy: 0.6 }, prefix: true }); verify that prefix matches use default weight of 0.375 while fuzzy uses 0.6"
+          },
+          {
+            "type": "function",
+            "location": "Lines 670-683: MiniSearch constructor with options.searchOptions.weights",
+            "priority": "high",
+            "reasoning": "Constructor options can include searchOptions with partial weights. This must be tested to ensure the partial weights are preserved and defaults are applied correctly during search operations.",
+            "suggestedTest": "should initialize with partial weights in searchOptions: const ms = new MiniSearch({ fields: ['text'], searchOptions: { weights: { fuzzy: 0.3 } } }); verify subsequent searches use fuzzy weight 0.3 and default prefix weight"
+          },
+          {
+            "type": "branch",
+            "location": "Lines 725-727: add - error handling when document has null ID",
+            "priority": "critical",
+            "reasoning": "Error handling for documents with null or undefined IDs is critical for data integrity. Must verify the correct error message is thrown.",
+            "suggestedTest": "should throw error with message including idField name when document ID is null: expect(() => miniSearch.add({ id: null, text: 'test' })).toThrow('MiniSearch: document does not have ID field \"id\"')"
+          },
+          {
+            "type": "branch",
+            "location": "Lines 729-731: add - duplicate ID handling",
+            "priority": "critical",
+            "reasoning": "Duplicate ID detection is critical to prevent index corruption. This path must be tested to ensure the duplicate check works correctly.",
+            "suggestedTest": "should throw error when adding document with duplicate ID: miniSearch.add({ id: 1, text: 'first' }); expect(() => miniSearch.add({ id: 1, text: 'duplicate' })).toThrow('MiniSearch: duplicate ID 1')"
+          },
+          {
+            "type": "branch",
+            "location": "Lines 1364-1368: search - with wildcard query",
+            "priority": "high",
+            "reasoning": "Wildcard queries have special optimization to skip sorting. This must be tested to verify both correctness and performance optimization.",
+            "suggestedTest": "should return all documents without sorting when wildcard query used without boostDocument: miniSearch.addAll([{ id: 1, text: 'a' }, { id: 2, text: 'b' }]); const results = miniSearch.search(MiniSearch.wildcard); expect results.length to equal 2 and all scores to equal 1"
+          },
+          {
+            "type": "branch",
+            "location": "Lines 1359-1361: search - with filter function",
+            "priority": "high",
+            "reasoning": "Filter function allows post-search filtering based on stored fields. This is a commonly used feature that must be thoroughly tested.",
+            "suggestedTest": "should filter search results using provided filter function: miniSearch.addAll([{ id: 1, text: 'test', cat: 'a' }, { id: 2, text: 'test', cat: 'b' }]); const results = miniSearch.search('test', { filter: (r) => r.cat === 'a' }); expect results.length to equal 1 and results[0].id to equal 1"
+          }
+        ],
+        "coverageEstimate": 0,
+        "summary": "No test files were found for src/MiniSearch.ts, resulting in 0% test coverage. The source file is a comprehensive search engine implementation with the MiniSearch class as the main export. Two key changes were identified: (1) Lines 52-61 introduce a new partial weights type with optional fuzzy and prefix properties; (2) Lines 1709-1712 implement new destructuring with default values to handle undefined or partial weights objects. These changes are CRITICAL to test as they affect all search operations using fuzzy or prefix matching. The 10 highest-priority untested paths identified focus on the new weights functionality and core error handling. Immediate action required: Create a comprehensive test suite covering at minimum the critical paths, especially the new weights functionality introduced in this PR."
+      },
+      "refactorings": {
+        "file": "src/MiniSearch.ts",
+        "suggestions": [
+          {
+            "type": "extract-function",
+            "location": "Lines 1696-1761: executeQuerySpec method",
+            "impact": "high",
+            "description": "The executeQuerySpec method is doing too much: it handles options merging, weight extraction, exact matching, prefix matching, and fuzzy matching. Extract the prefix and fuzzy matching logic into separate methods.",
+            "before": "private executeQuerySpec (query: QuerySpec, searchOptions: SearchOptions): RawResult {\n  // ~65 lines of complex logic mixing concerns\n  const options: SearchOptionsWithDefaults = { ...this._options.searchOptions, ...searchOptions }\n  // ... weight calculation\n  // ... exact match\n  // ... prefix match logic\n  // ... fuzzy match logic\n}",
+            "after": "private executeQuerySpec (query: QuerySpec, searchOptions: SearchOptions): RawResult {\n  const options = this.buildSearchOptionsWithDefaults(searchOptions)\n  const { boosts, weights } = this.extractSearchParameters(options)\n  const results = this.getExactMatches(query, weights, boosts, options)\n  this.addPrefixMatches(query, weights, boosts, options, results)\n  this.addFuzzyMatches(query, weights, boosts, options, results)\n  return results\n}",
+            "benefits": "Improves readability, testability, and maintainability by separating concerns. Each extracted method can be tested independently and has a single, clear responsibility."
+          },
+          {
+            "type": "extract-function",
+            "location": "Lines 1852-1918: termResults method",
+            "impact": "high",
+            "description": "The termResults method is very long (66 lines) and handles multiple responsibilities: filtering fields, processing term frequencies, calculating scores, and updating results. Extract sub-methods for score calculation and result updating.",
+            "before": "private termResults (\n  sourceTerm: string,\n  derivedTerm: string,\n  termWeight: number,\n  // ... many parameters\n): RawResult {\n  // 66 lines of complex logic\n}",
+            "after": "private termResults(...): RawResult {\n  if (fieldTermData == null) return results\n  for (const field of Object.keys(fieldBoosts)) {\n    this.processFieldTermResults(field, fieldBoosts[field], ...)\n  }\n  return results\n}\n\nprivate processFieldTermResults(field: string, fieldBoost: number, ...): void {\n  // Extracted logic for processing a single field's term results\n}",
+            "benefits": "Reduces method complexity, improves readability, and makes the code easier to test and maintain. Separate methods for field processing enable better unit testing."
+          },
+          {
+            "type": "extract-function",
+            "location": "Lines 1699-1700: field boost calculation",
+            "impact": "medium",
+            "description": "Extract the field boost calculation logic into a separate method for clarity and potential reuse.",
+            "before": "const boosts = (options.fields || this._options.fields).reduce((boosts, field) =>\n  ({ ...boosts, [field]: getOwnProperty(options.boost, field) || 1 }), {})",
+            "after": "const boosts = this.calculateFieldBoosts(options)",
+            "benefits": "Improves code clarity by giving the calculation a descriptive name. Enables reuse if needed elsewhere and makes testing easier."
+          },
+          {
+            "type": "simplify",
+            "location": "Lines 783-795: addAllAsync reduce function",
+            "impact": "medium",
+            "description": "The reduce function in addAllAsync creates a complex nested structure. This can be simplified with a more readable approach using a for loop or splitting the logic.",
+            "before": "const { chunk, promise } = documents.reduce(({ chunk, promise }, document: T, i: number) => {\n  chunk.push(document)\n  if ((i + 1) % chunkSize === 0) {\n    return {\n      chunk: [],\n      promise: promise\n        .then(() => new Promise(resolve => setTimeout(resolve, 0)))\n        .then(() => this.addAll(chunk))\n    }\n  } else {\n    return { chunk, promise }\n  }\n}, acc)",
+            "after": "let promise = Promise.resolve()\nlet chunk: T[] = []\nfor (let i = 0; i < documents.length; i++) {\n  chunk.push(documents[i])\n  if ((i + 1) % chunkSize === 0) {\n    const currentChunk = chunk\n    promise = promise\n      .then(() => new Promise(resolve => setTimeout(resolve, 0)))\n      .then(() => this.addAll(currentChunk))\n    chunk = []\n  }\n}\nreturn promise.then(() => this.addAll(chunk))",
+            "benefits": "Improves readability by using a more straightforward control flow. The for loop pattern is more familiar and easier to understand than the reduce pattern for this use case."
+          },
+          {
+            "type": "extract-function",
+            "location": "Lines 1730-1747: prefix matching logic",
+            "impact": "medium",
+            "description": "The prefix matching logic block is self-contained and could be extracted into its own method for better separation of concerns.",
+            "before": "if (prefixMatches) {\n  for (const [term, data] of prefixMatches) {\n    const distance = term.length - query.term.length\n    if (!distance) { continue }\n    fuzzyMatches?.delete(term)\n    const weight = prefixWeight * term.length / (term.length + 0.3 * distance)\n    this.termResults(query.term, term, weight, query.termBoost, data, boosts, boostDocument, bm25params, results)\n  }\n}",
+            "after": "this.processPrefixMatches(prefixMatches, fuzzyMatches, query, prefixWeight, boosts, boostDocument, bm25params, results)",
+            "benefits": "Separates prefix matching logic into a dedicated method, improving code organization and testability. Makes the main method flow clearer."
+          },
+          {
+            "type": "extract-function",
+            "location": "Lines 1749-1759: fuzzy matching logic",
+            "impact": "medium",
+            "description": "Similar to prefix matching, the fuzzy matching logic is self-contained and should be extracted.",
+            "before": "if (fuzzyMatches) {\n  for (const term of fuzzyMatches.keys()) {\n    const [data, distance] = fuzzyMatches.get(term)!\n    if (!distance) { continue }\n    const weight = fuzzyWeight * term.length / (term.length + distance)\n    this.termResults(query.term, term, weight, query.termBoost, data, boosts, boostDocument, bm25params, results)\n  }\n}",
+            "after": "this.processFuzzyMatches(fuzzyMatches, query, fuzzyWeight, boosts, boostDocument, bm25params, results)",
+            "benefits": "Improves separation of concerns and makes the code more modular. Enables easier testing of fuzzy matching logic in isolation."
+          },
+          {
+            "type": "extract-function",
+            "location": "Lines 736-756: field processing in add method",
+            "impact": "medium",
+            "description": "The field processing loop in the add method mixes tokenization, term processing, and indexing. Extract the field indexing logic into a separate method.",
+            "before": "for (const field of fields) {\n  const fieldValue = extractField(document, field)\n  if (fieldValue == null) continue\n  const tokens = tokenize(fieldValue.toString(), field)\n  const fieldId = this._fieldIds[field]\n  const uniqueTerms = new Set(tokens).size\n  this.addFieldLength(shortDocumentId, fieldId, this._documentCount - 1, uniqueTerms)\n  for (const term of tokens) {\n    // ... process and add terms\n  }\n}",
+            "after": "for (const field of fields) {\n  this.indexDocumentField(document, field, shortDocumentId)\n}\n\nprivate indexDocumentField(document: T, field: string, shortDocumentId: number): void {\n  // Extracted field indexing logic\n}",
+            "benefits": "Simplifies the add method and creates a reusable field indexing method. Improves testability by isolating field indexing logic."
+          },
+          {
+            "type": "pattern-improvement",
+            "location": "Lines 52-61: weights type definition",
+            "impact": "medium",
+            "description": "The weights type definition in SearchOptions has default values in JSDoc comments. Consider using a proper defaults object with Required utility type or a builder pattern to ensure type safety for defaults.",
+            "before": "weights?: {\n  /**\n   * @default 0.45\n   */\n  fuzzy?: number\n  /**\n   * @default 0.375\n   */\n  prefix?: number\n}",
+            "after": "// Define a constant for weight defaults\nexport const DEFAULT_SEARCH_WEIGHTS = {\n  fuzzy: 0.45,\n  prefix: 0.375\n} as const\n\nexport type SearchWeights = Partial<typeof DEFAULT_SEARCH_WEIGHTS>\n\n// In SearchOptions:\nweights?: SearchWeights",
+            "benefits": "Makes defaults explicit and type-safe. TypeScript can now reference the actual default values, improving IDE support and reducing duplication between documentation and code."
+          },
+          {
+            "type": "simplify",
+            "location": "Lines 1709-1712: weights destructuring",
+            "impact": "low",
+            "description": "Destructuring with fallback to nested default can be simplified using modern JavaScript destructuring with default values directly in the parameter or simplified with nullish coalescing.",
+            "before": "const {\n  fuzzy: fuzzyWeight = defaultSearchOptions.weights.fuzzy,\n  prefix: prefixWeight = defaultSearchOptions.weights.prefix\n} = weights || {}",
+            "after": "const fuzzyWeight = weights?.fuzzy ?? defaultSearchOptions.weights.fuzzy\nconst prefixWeight = weights?.prefix ?? defaultSearchOptions.weights.prefix",
+            "benefits": "More explicit about the null-handling behavior and avoids the problematic || operator that treats 0 as falsy."
+          },
+          {
+            "type": "modernize",
+            "location": "Lines 938: semicolon prefix pattern",
+            "impact": "low",
+            "description": "The semicolon prefix on line 938 is an outdated pattern used to protect against ASI issues. Modern linting and formatting tools make this unnecessary.",
+            "before": ";(this._fieldLength.get(shortId) || []).forEach((fieldLength, fieldId) => {\n  this.removeFieldLength(shortId, fieldId, this._documentCount, fieldLength)\n})",
+            "after": "const fieldLengths = this._fieldLength.get(shortId) || []\nfieldLengths.forEach((fieldLength, fieldId) => {\n  this.removeFieldLength(shortId, fieldId, this._documentCount, fieldLength)\n})",
+            "benefits": "Removes outdated defensive pattern and improves code readability. The extracted variable also makes the code clearer."
+          }
+        ],
+        "summary": "Analysis identified 10 refactoring opportunities with varying impact levels. High-impact suggestions focus on extracting methods from executeQuerySpec and termResults which are doing too much and mixing concerns. Medium-impact improvements include simplifying the addAllAsync reduce pattern, extracting field boost calculation, and separating prefix/fuzzy matching logic. Low-impact changes include modernizing destructuring patterns at lines 1709-1712, removing defensive semicolons, and using nullish coalescing. The weights type definition at lines 52-61 would benefit from a more explicit default values pattern using a constant. Overall, the code is well-structured but would benefit from smaller, more focused methods and modern JavaScript idioms."
+      }
+    }
+  ],
+  "summary": {
+    "totalFiles": 1,
+    "overallScore": 78,
+    "criticalIssues": 2,
+    "highPriorityTests": 6,
+    "refactoringOpportunities": 4
+  },
+  "recommendations": [
+    {
+      "priority": "critical",
+      "category": "Bug Fix Required",
+      "description": "Fix the weights destructuring bug at lines 1709-1712 that prevents users from setting fuzzy or prefix weights to 0. Change from || {} to ?? {} to use nullish coalescing. This is blocking the PR from being merged safely.",
+      "files": [
+        "src/MiniSearch.ts"
+      ]
+    },
+    {
+      "priority": "high",
+      "category": "Test Coverage",
+      "description": "Add comprehensive test coverage for the new partial weights functionality introduced in this PR. Tests must cover: (1) partial weights with only fuzzy specified, (2) partial weights with only prefix specified, (3) empty weights object, (4) undefined weights object, (5) weights with explicit 0 values. Currently 0% test coverage exists for these changes.",
+      "files": [
+        "src/MiniSearch.ts"
+      ]
+    },
+    {
+      "priority": "high",
+      "category": "Security",
+      "description": "Add prototype pollution protection to the default extractField function and replace toString() calls with String() constructor to prevent triggering malicious custom implementations on user-supplied objects.",
+      "files": [
+        "src/MiniSearch.ts"
+      ]
+    },
+    {
+      "priority": "medium",
+      "category": "Performance",
+      "description": "Replace Array.includes() calls in assignUniqueTerm and assignUniqueTerms functions (lines 2190-2200) with Set-based implementations to improve from O(n) and O(n*m) complexity to O(1) lookups. This affects search performance for queries with many terms.",
+      "files": [
+        "src/MiniSearch.ts"
+      ]
+    },
+    {
+      "priority": "medium",
+      "category": "Code Quality",
+      "description": "Extract executeQuerySpec (lines 1696-1761) and termResults (lines 1852-1918) methods into smaller, focused functions. These methods are too long and mix multiple responsibilities, reducing maintainability and testability.",
+      "files": [
+        "src/MiniSearch.ts"
+      ]
+    },
+    {
+      "priority": "medium",
+      "category": "Type Safety",
+      "description": "Create an explicit DEFAULT_SEARCH_WEIGHTS constant and use it consistently throughout the codebase instead of embedding default values in JSDoc comments. This improves type safety and reduces duplication between documentation and code.",
+      "files": [
+        "src/MiniSearch.ts"
+      ]
+    },
+    {
+      "priority": "low",
+      "category": "Modernization",
+      "description": "Remove outdated patterns including semicolon prefix at line 938, simplify nested ternary operations, and use Object.hasOwn instead of Object.prototype.hasOwnProperty.call where supported.",
+      "files": [
+        "src/MiniSearch.ts"
+      ]
+    }
+  ],
+  "metadata": {
+    "analyzedAt": "2026-09-26T01:39:34.027Z",
+    "duration": 425030,
+    "agentVersions": {
+      "code-quality-analyzer": "1.0.0",
+      "test-coverage-analyzer": "1.0.0",
+      "refactoring-suggester": "1.0.0"
+    }
+  }
+}

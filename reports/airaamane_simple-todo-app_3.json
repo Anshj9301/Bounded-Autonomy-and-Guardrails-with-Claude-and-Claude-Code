@@ -1,0 +1,633 @@
+{
+  "pullRequest": {
+    "owner": "damisparks",
+    "repo": "todo-app-review-fixture",
+    "number": 3
+  },
+  "fileReviews": [
+    {
+      "file": "src/server.js",
+      "codeQuality": {
+        "file": "src/server.js",
+        "issues": [
+          {
+            "line": 35,
+            "severity": "critical",
+            "category": "security",
+            "description": "Missing input validation on subscription upgrade endpoint. The userId, plan, and addons parameters are passed directly to upgradeSubscription() without validation, creating potential for injection attacks, type confusion, or privilege escalation.",
+            "suggestion": "Add comprehensive input validation for userId (ensure it's a valid number/string), plan (whitelist allowed plans), and addons (validate structure and allowed values)."
+          },
+          {
+            "line": 35,
+            "severity": "critical",
+            "category": "security",
+            "description": "No authentication or authorization on sensitive subscription upgrade endpoint. Any user can potentially upgrade any userId to any plan without authentication checks.",
+            "suggestion": "Implement authentication middleware to verify the requesting user's identity and authorization to perform subscription upgrades."
+          },
+          {
+            "line": 7,
+            "severity": "high",
+            "category": "security",
+            "description": "Missing security headers and middleware. No helmet.js or CORS configuration, leaving the application vulnerable to common web attacks (XSS, clickjacking, MIME sniffing, etc.).",
+            "suggestion": "Add security middleware like helmet.js and configure CORS properly."
+          },
+          {
+            "line": 7,
+            "severity": "high",
+            "category": "security",
+            "description": "No request rate limiting configured. The application is vulnerable to denial-of-service attacks and brute-force attempts, especially on the subscription upgrade endpoint.",
+            "suggestion": "Implement rate limiting using express-rate-limit."
+          },
+          {
+            "line": 1,
+            "severity": "high",
+            "category": "best-practice",
+            "description": "Missing error handling middleware. Unhandled errors in async operations or middleware will crash the server or leak error details to clients.",
+            "suggestion": "Add comprehensive error handling middleware at the end of the middleware chain."
+          },
+          {
+            "line": 23,
+            "severity": "medium",
+            "category": "security",
+            "description": "Integer ID conversion without validation. Number(req.params.id) can return NaN for invalid input, potentially causing unexpected behavior in toggleTodo/removeTodo functions.",
+            "suggestion": "Validate the ID parameter before conversion using parseInt with validation."
+          },
+          {
+            "line": 7,
+            "severity": "medium",
+            "category": "security",
+            "description": "No request body size limit configured. The express.json() middleware has no size limit, making the server vulnerable to payload-based DoS attacks.",
+            "suggestion": "Set a reasonable body size limit: app.use(express.json({ limit: '10kb' }));"
+          },
+          {
+            "line": 14,
+            "severity": "medium",
+            "category": "best-practice",
+            "description": "Inconsistent error response format. Some endpoints return { error: '...' } while the structure varies. This makes client-side error handling more difficult.",
+            "suggestion": "Standardize error responses across all endpoints using a helper function."
+          },
+          {
+            "line": 7,
+            "severity": "medium",
+            "category": "maintainability",
+            "description": "Route handlers are inline anonymous functions, making the code harder to test and maintain. Business logic is mixed with routing concerns.",
+            "suggestion": "Extract route handlers into separate controller functions for better testability and maintainability."
+          },
+          {
+            "line": 42,
+            "severity": "medium",
+            "category": "maintainability",
+            "description": "Server startup logic mixed with route definitions. This makes it harder to use the app instance in tests without starting the server.",
+            "suggestion": "Separate server startup into a dedicated file (e.g., server.js vs app.js)."
+          },
+          {
+            "line": 23,
+            "severity": "low",
+            "category": "best-practice",
+            "description": "Duplicated error handling logic for 404 responses across multiple endpoints. The pattern 'if (!todo) return res.status(404)...' is repeated.",
+            "suggestion": "Create a reusable helper function for 404 handling."
+          },
+          {
+            "line": 43,
+            "severity": "low",
+            "category": "maintainability",
+            "description": "Console.log used for application logging. In production, structured logging with proper log levels is essential for debugging and monitoring.",
+            "suggestion": "Use a proper logging library like winston or pino."
+          },
+          {
+            "line": 35,
+            "severity": "low",
+            "category": "best-practice",
+            "description": "HTTP 200 returned for subscription upgrade instead of 201 (Created) or 204 (No Content). While not incorrect, using 201 for resource creation or modification is more semantically accurate.",
+            "suggestion": "Use appropriate HTTP status codes: res.status(201).json(...);"
+          }
+        ],
+        "overallScore": 42,
+        "summary": "The server.js file contains several critical security vulnerabilities that must be addressed immediately. The most severe issues are: (1) No authentication/authorization on the subscription upgrade endpoint, allowing any user to upgrade any account; (2) Complete lack of input validation on the subscription endpoint parameters; (3) Missing essential security middleware (helmet, CORS, rate limiting). Additionally, there are high-severity concerns around error handling, request body size limits, and ID parameter validation. From a maintainability perspective, the code mixes routing with business logic, uses inline handlers that are difficult to test, and lacks proper error handling middleware. The code quality score of 42/100 reflects these critical security gaps and architectural concerns."
+      },
+      "testCoverage": {
+        "file": "src/server.js",
+        "hasTests": false,
+        "testFiles": [],
+        "untestedPaths": [
+          {
+            "type": "function",
+            "location": "GET /todos endpoint (lines 10-12)",
+            "priority": "high",
+            "reasoning": "This is the primary read endpoint for the application. It needs testing to ensure todos are returned correctly in the expected JSON format. Without tests, regressions in the listTodos() function or response serialization could break the API contract.",
+            "suggestedTest": "should return list of all todos with 200 status - expect(response.status).toBe(200); expect(response.body).toEqual(expect.arrayContaining([expect.objectContaining({ id: expect.any(Number), text: expect.any(String) })]))"
+          },
+          {
+            "type": "function",
+            "location": "POST /todos endpoint - success path (lines 14-21)",
+            "priority": "critical",
+            "reasoning": "This is the primary write operation for creating todos. The success path involves validation passing, text trimming, and returning the created resource. This is critical functionality that must work correctly for the app to function.",
+            "suggestedTest": "should create a new todo when valid text is provided and return 201 with the created todo - expect(response.status).toBe(201); expect(response.body).toMatchObject({ id: expect.any(Number), text: 'Buy groceries', completed: false })"
+          },
+          {
+            "type": "branch",
+            "location": "POST /todos endpoint - validation failure path (lines 17-19)",
+            "priority": "critical",
+            "reasoning": "Input validation is a critical security and data integrity concern. Without testing this path, invalid data could enter the system. This tests the error-handling branch when validation.valid is false.",
+            "suggestedTest": "should return 400 with error message when todo text is invalid - expect(response.status).toBe(400); expect(response.body).toEqual({ error: 'Todo text is required' })"
+          },
+          {
+            "type": "edge-case",
+            "location": "POST /todos endpoint - text trimming (line 20)",
+            "priority": "medium",
+            "reasoning": "The .trim() operation is data normalization logic that affects data quality. Without testing, users could create todos with excessive whitespace.",
+            "suggestedTest": "should trim whitespace from todo text before creating - const response = await request(app).post('/todos').send({ text: '  Clean room  ' }); expect(response.body.text).toBe('Clean room')"
+          },
+          {
+            "type": "function",
+            "location": "PATCH /todos/:id/toggle endpoint - success path (lines 23-27)",
+            "priority": "high",
+            "reasoning": "Toggling todos is a core user interaction. This tests the happy path where a valid todo ID is provided and the todo is successfully toggled.",
+            "suggestedTest": "should toggle todo completion status and return 200 with updated todo - expect(response.status).toBe(200); expect(response.body).toMatchObject({ id: 1, completed: true })"
+          },
+          {
+            "type": "branch",
+            "location": "PATCH /todos/:id/toggle endpoint - not found path (line 25)",
+            "priority": "high",
+            "reasoning": "Error handling for missing resources is critical for API correctness. Without testing this path, the application could return incorrect status codes or crash when invalid IDs are provided.",
+            "suggestedTest": "should return 404 with error message when attempting to toggle non-existent todo id - expect(response.status).toBe(404); expect(response.body).toEqual({ error: 'not found' })"
+          },
+          {
+            "type": "edge-case",
+            "location": "PATCH /todos/:id/toggle endpoint - id parsing (line 24)",
+            "priority": "medium",
+            "reasoning": "Number(req.params.id) will return NaN for non-numeric strings. This edge case should be tested to ensure the application handles invalid ID formats without crashing.",
+            "suggestedTest": "should handle non-numeric id parameter gracefully - expect(response.status).toBe(404)"
+          },
+          {
+            "type": "function",
+            "location": "DELETE /todos/:id endpoint - success path (lines 29-33)",
+            "priority": "high",
+            "reasoning": "Deleting todos is core functionality. The 204 status with empty body is the correct REST pattern for successful deletions.",
+            "suggestedTest": "should delete todo and return 204 No Content when valid id is provided - expect(response.status).toBe(204); expect(response.body).toEqual({})"
+          },
+          {
+            "type": "branch",
+            "location": "DELETE /todos/:id endpoint - not found path (line 31)",
+            "priority": "high",
+            "reasoning": "Consistent error handling for missing resources across all endpoints is important for API usability. This validates the !removed conditional branch.",
+            "suggestedTest": "should return 404 with error message when attempting to delete non-existent todo id - expect(response.status).toBe(404); expect(response.body).toEqual({ error: 'not found' })"
+          },
+          {
+            "type": "function",
+            "location": "POST /subscriptions/upgrade endpoint (lines 35-38)",
+            "priority": "critical",
+            "reasoning": "This is the premium subscription endpoint introduced in PR-3. It handles monetization logic which is business-critical. Without tests, subscription upgrades could fail, directly impacting revenue.",
+            "suggestedTest": "should upgrade subscription and return 200 with subscription details - expect(response.status).toBe(200); expect(response.body).toMatchObject({ userId: 'user123', plan: 'premium', addons: ['feature1'] })"
+          },
+          {
+            "type": "edge-case",
+            "location": "POST /subscriptions/upgrade endpoint - missing parameters (lines 35-38)",
+            "priority": "critical",
+            "reasoning": "There is no validation for the subscription upgrade parameters in the endpoint handler. This is a security and data integrity risk.",
+            "suggestedTest": "should handle missing or invalid userId, plan, or addons parameters appropriately - expect(response.status).toBe(400)"
+          }
+        ],
+        "coverageEstimate": 0,
+        "summary": "CRITICAL COVERAGE GAP: src/server.js has ZERO test coverage. No test files exist for this Express application server, leaving all 5 API endpoints and multiple code branches completely untested. The file contains 15+ distinct testable paths including 5 HTTP endpoints, 4 error-handling branches, 3 edge cases, and 1 new premium subscription feature (PR-3). HIGH-PRIORITY GAPS: POST /subscriptions/upgrade endpoint (business-critical monetization), POST /todos validation (input validation failures), all 404 error paths, and core CRUD operations lack verification. The estimated coverage is 0% because no tests exist. A comprehensive test suite should aim for 90%+ coverage including all success paths, error paths, and edge cases."
+      },
+      "refactorings": {
+        "file": "src/server.js",
+        "suggestions": [
+          {
+            "type": "extract-function",
+            "location": "lines 26-30",
+            "impact": "medium",
+            "description": "Extract ID parsing and 404 error handling into middleware or helper functions. The pattern of parsing req.params.id to Number and returning 404 is duplicated across multiple routes.",
+            "before": "app.patch('/todos/:id/toggle', (req, res) => {\n  const todo = toggleTodo(Number(req.params.id));\n  if (!todo) return res.status(404).json({ error: 'not found' });\n  res.json(todo);\n});",
+            "after": "const parseIdParam = (req, res, next) => {\n  req.todoId = Number(req.params.id);\n  next();\n};\n\napp.patch('/todos/:id/toggle', parseIdParam, (req, res) => {\n  const todo = toggleTodo(req.todoId);\n  if (!todo) return res.status(404).json({ error: 'not found' });\n  res.json(todo);\n});",
+            "benefits": "Reduces duplication and centralizes ID parsing logic for consistency and maintainability."
+          },
+          {
+            "type": "extract-function",
+            "location": "lines 11-40",
+            "impact": "high",
+            "description": "Extract route handlers into a separate routes module. All route definitions are inline anonymous functions, making the main server file do too much. This violates separation of concerns.",
+            "before": "app.get('/todos', (req, res) => {\n  res.json(listTodos());\n});",
+            "after": "// routes/todos.js\nexport const getTodos = (req, res) => {\n  res.json(listTodos());\n};\n\n// server.js\nimport { getTodos } from './routes/todos.js';\napp.get('/todos', getTodos);",
+            "benefits": "Improves testability, separates concerns, and makes the codebase more maintainable and scalable."
+          },
+          {
+            "type": "pattern-improvement",
+            "location": "lines 11-40",
+            "impact": "high",
+            "description": "Implement Express Router pattern to organize routes by domain. Currently all routes are registered directly on the app instance, mixing todos and subscriptions concerns.",
+            "before": "app.get('/todos', (req, res) => { /* ... */ });\napp.post('/subscriptions/upgrade', (req, res) => { /* ... */ });",
+            "after": "// routes/todos.routes.js\nimport { Router } from 'express';\nconst router = Router();\nrouter.get('/', getTodos);\nexport default router;\n\n// server.js\nimport todosRouter from './routes/todos.routes.js';\napp.use('/todos', todosRouter);",
+            "benefits": "Better code organization, clearer domain separation, and easier to maintain as the application grows."
+          },
+          {
+            "type": "simplify",
+            "location": "lines 26-35",
+            "impact": "medium",
+            "description": "Standardize error response format. Currently using inconsistent error messages. Create a consistent error response helper.",
+            "before": "if (!todo) return res.status(404).json({ error: 'not found' });",
+            "after": "export const sendNotFound = (res, resource = 'Resource') => \n  res.status(404).json({ error: `${resource} not found` });\n\nif (!todo) return sendNotFound(res, 'Todo');",
+            "benefits": "Consistent API responses, better client-side error handling, and centralized error formatting."
+          },
+          {
+            "type": "extract-function",
+            "location": "lines 42-45",
+            "impact": "medium",
+            "description": "Extract server initialization into a separate function to support better testing and allow the module to be imported without side effects.",
+            "before": "const PORT = process.env.PORT || 3000;\napp.listen(PORT, () => {\n  console.log(`todo-app-review-fixture listening on port ${PORT}`);\n});\nexport default app;",
+            "after": "export const startServer = (port = process.env.PORT || 3000) => {\n  return app.listen(port, () => {\n    console.log(`Server listening on port ${port}`);\n  });\n};\nexport default app;",
+            "benefits": "Enables testing the app without starting the server, eliminates side effects on module import."
+          },
+          {
+            "type": "modernize",
+            "location": "lines 14-21",
+            "impact": "medium",
+            "description": "Replace callback-style route handlers with async/await pattern for consistency and future-proofing.",
+            "before": "app.post('/todos', (req, res) => {\n  const { text } = req.body;\n  res.status(201).json(addTodo(text.trim()));\n});",
+            "after": "app.post('/todos', async (req, res) => {\n  try {\n    const { text } = req.body;\n    const todo = await addTodo(text.trim());\n    res.status(201).json(todo);\n  } catch (error) {\n    res.status(500).json({ error: 'Internal server error' });\n  }\n});",
+            "benefits": "Future-proofs code for async operations, provides consistent error handling pattern."
+          },
+          {
+            "type": "simplify",
+            "location": "lines 37-40",
+            "impact": "high",
+            "description": "Add input validation middleware for the subscription upgrade endpoint. Unlike the todos endpoint which validates input, the subscription endpoint has no validation.",
+            "before": "app.post('/subscriptions/upgrade', (req, res) => {\n  const { userId, plan, addons } = req.body;\n  res.status(200).json(upgradeSubscription(userId, plan, addons));\n});",
+            "after": "export const validateUpgradeRequest = (req, res, next) => {\n  const { userId, plan } = req.body;\n  if (!userId || !plan) {\n    return res.status(400).json({ error: 'userId and plan are required' });\n  }\n  next();\n};\n\napp.post('/subscriptions/upgrade', validateUpgradeRequest, (req, res) => {\n  const { userId, plan, addons } = req.body;\n  res.status(200).json(upgradeSubscription(userId, plan, addons));\n});",
+            "benefits": "Adds critical input validation for security and data integrity consistency across endpoints."
+          }
+        ],
+        "summary": "The server.js file is functional but has several structural opportunities for improvement. The highest-impact refactorings are: (1) extracting route handlers into separate modules using Express Router pattern to improve organization and testability, (2) adding input validation to the subscription endpoint for consistency and security, and (3) extracting the server initialization to eliminate side effects on module import. Medium-impact improvements include creating reusable middleware for ID parsing and error responses, and modernizing to async/await for future flexibility. Overall, the code would benefit from better separation of concerns and more consistent patterns across all endpoints."
+      }
+    },
+    {
+      "file": "src/subscription.js",
+      "codeQuality": {
+        "file": "src/subscription.js",
+        "issues": [
+          {
+            "line": 5,
+            "severity": "high",
+            "category": "best-practice",
+            "description": "Using loose equality (==) instead of strict equality (===) for string comparisons",
+            "suggestion": "Replace all == with === for type-safe comparisons. Change 'plan == \"basic\"' to 'plan === \"basic\"' on lines 5, 7, 9, 16, 18, 20, 25, 27, 29."
+          },
+          {
+            "line": 5,
+            "severity": "high",
+            "category": "maintainability",
+            "description": "Magic numbers for pricing scattered throughout code without constants or configuration",
+            "suggestion": "Extract pricing into a configuration object: const PRICING = { basic: 4.99, pro: 9.99, enterprise: 29.99, addons: { 'extra-storage': 2.5, 'priority-support': 5 } }."
+          },
+          {
+            "line": 5,
+            "severity": "high",
+            "category": "maintainability",
+            "description": "Repetitive if-else chains that should use a lookup object or Map",
+            "suggestion": "Replace the if-else chain with object lookup: const prices = { basic: 4.99, pro: 9.99, enterprise: 29.99 }; price = prices[plan] || 0;"
+          },
+          {
+            "line": 15,
+            "severity": "high",
+            "category": "bug-risk",
+            "description": "Addon pricing is applied uniformly regardless of plan tier, but the nested if-else suggests plan-specific pricing was intended",
+            "suggestion": "Remove redundant plan checks if addon prices are uniform across all plans, or implement plan-specific addon pricing properly."
+          },
+          {
+            "line": 15,
+            "severity": "medium",
+            "category": "performance",
+            "description": "Duplicate addon price logic with unnecessary nested if-else chains",
+            "suggestion": "Refactor addon logic into a loop: const addonPrices = { 'extra-storage': 2.5, 'priority-support': 5 }; addons?.forEach(addon => { price += addonPrices[addon] || 0; })."
+          },
+          {
+            "line": 2,
+            "severity": "medium",
+            "category": "security",
+            "description": "Missing input validation for plan and addons parameters",
+            "suggestion": "Add validation: if (!plan || typeof plan !== 'string') { throw new Error('Invalid plan'); }. Validate addons is an array if provided."
+          },
+          {
+            "line": 41,
+            "severity": "medium",
+            "category": "security",
+            "description": "Missing input validation for userId parameter",
+            "suggestion": "Validate userId is not null/undefined/empty: if (!userId) { throw new Error('Invalid userId'); }."
+          },
+          {
+            "line": 11,
+            "severity": "medium",
+            "category": "bug-risk",
+            "description": "Silent failure for invalid plan returns 0 price instead of throwing error",
+            "suggestion": "Invalid plans should throw an error: throw new Error(`Invalid plan: ${plan}`) instead of returning 0."
+          },
+          {
+            "line": 17,
+            "severity": "medium",
+            "category": "maintainability",
+            "description": "Using 'price = price + X' instead of the cleaner 'price += X' operator",
+            "suggestion": "Replace 'price = price + 2.5' with 'price += 2.5' for better readability."
+          },
+          {
+            "line": 2,
+            "severity": "medium",
+            "category": "maintainability",
+            "description": "Function lacks JSDoc documentation explaining parameters, return value, and behavior",
+            "suggestion": "Add JSDoc: /**\n * Calculates subscription price with addons\n * @param {string} plan - Plan tier (basic|pro|enterprise)\n * @param {string[]} [addons] - Optional addon features\n * @returns {number} Total price\n */"
+          },
+          {
+            "line": 41,
+            "severity": "medium",
+            "category": "best-practice",
+            "description": "Use optional chaining and modern array methods appropriately",
+            "suggestion": "Combine with refactored approach for cleaner logic using modern JavaScript patterns."
+          },
+          {
+            "line": 41,
+            "severity": "low",
+            "category": "best-practice",
+            "description": "Unnecessary property shorthand verbosity",
+            "suggestion": "Use object shorthand: return { userId, plan, addons: addons || [], price, upgradedAt: new Date().toISOString() }"
+          },
+          {
+            "line": 48,
+            "severity": "low",
+            "category": "performance",
+            "description": "Creating new Date object on every call could be inefficient in high-frequency scenarios",
+            "suggestion": "Consider passing timestamp as parameter or accepting it from caller for better testability."
+          }
+        ],
+        "overallScore": 42,
+        "summary": "The code has significant maintainability and best-practice issues. PRIMARY CONCERNS: (1) Extensive use of loose equality (==) instead of strict equality (===) throughout - a common source of bugs in JavaScript. (2) Heavy code duplication in addon pricing logic with identical amounts repeated across all plan tiers. (3) Magic numbers scattered throughout without constants - pricing values should be centralized. (4) Missing input validation on all parameters, allowing invalid data to flow through. MODERATE ISSUES: Repetitive if-else chains that should use object lookups; lack of documentation; silent failure on invalid plans returns 0 instead of throwing errors. The code uses some modern features like optional chaining but needs refactoring to use configuration objects for pricing, implement proper validation, switch to strict equality, and eliminate duplication."
+      },
+      "testCoverage": {
+        "file": "src/subscription.js",
+        "hasTests": false,
+        "testFiles": [],
+        "untestedPaths": [
+          {
+            "type": "branch",
+            "location": "calculatePrice - invalid plan handling (lines 2-39)",
+            "priority": "critical",
+            "reasoning": "The else branch handles invalid plan names by returning 0, which could mask configuration errors in production. This is a critical edge case that should explicitly validate input or throw an error rather than silently failing.",
+            "suggestedTest": "calculatePrice returns 0 for invalid plan names - expect(calculatePrice('invalid-plan', [])).toBe(0)"
+          },
+          {
+            "type": "function",
+            "location": "calculatePrice - basic plan (lines 5-6)",
+            "priority": "high",
+            "reasoning": "This tests the primary happy path for the basic tier. Without this test, there's no validation that the most common use case works correctly.",
+            "suggestedTest": "calculatePrice returns correct base price for basic plan without addons - expect(calculatePrice('basic', [])).toBe(4.99)"
+          },
+          {
+            "type": "function",
+            "location": "calculatePrice - pro plan (lines 7-8)",
+            "priority": "high",
+            "reasoning": "Tests the pro tier pricing branch, ensuring mid-tier pricing is correctly implemented.",
+            "suggestedTest": "calculatePrice returns correct base price for pro plan without addons - expect(calculatePrice('pro', [])).toBe(9.99)"
+          },
+          {
+            "type": "function",
+            "location": "calculatePrice - enterprise plan (lines 9-10)",
+            "priority": "high",
+            "reasoning": "Tests the enterprise tier pricing branch, critical for highest-value customers.",
+            "suggestedTest": "calculatePrice returns correct base price for enterprise plan without addons - expect(calculatePrice('enterprise', [])).toBe(29.99)"
+          },
+          {
+            "type": "branch",
+            "location": "calculatePrice - extra-storage addon (lines 17-25)",
+            "priority": "high",
+            "reasoning": "Tests the extra-storage addon branch for basic plan. This validates that the addon pricing logic works correctly and the 2.5 addon fee is applied.",
+            "suggestedTest": "calculatePrice adds extra-storage addon cost for basic plan - expect(calculatePrice('basic', ['extra-storage'])).toBe(7.49)"
+          },
+          {
+            "type": "branch",
+            "location": "calculatePrice - priority-support addon (lines 27-35)",
+            "priority": "high",
+            "reasoning": "Tests the priority-support addon branch for pro plan. This validates the 5.00 addon fee is correctly added to the base price.",
+            "suggestedTest": "calculatePrice adds priority-support addon cost for pro plan - expect(calculatePrice('pro', ['priority-support'])).toBe(14.99)"
+          },
+          {
+            "type": "edge-case",
+            "location": "calculatePrice - multiple addons (lines 17-35)",
+            "priority": "high",
+            "reasoning": "Tests the combination of multiple addons. This validates that both addon branches execute correctly when combined, ensuring 29.99 + 2.5 + 5 = 37.49.",
+            "suggestedTest": "calculatePrice correctly adds both addons to enterprise plan - expect(calculatePrice('enterprise', ['extra-storage', 'priority-support'])).toBe(37.49)"
+          },
+          {
+            "type": "edge-case",
+            "location": "calculatePrice - null addons (lines 2-39)",
+            "priority": "high",
+            "reasoning": "The function checks 'addons &&' before accessing it, but there's no test confirming null is handled correctly. This is a common edge case when addons are optional.",
+            "suggestedTest": "calculatePrice handles null addons parameter - expect(calculatePrice('basic', null)).toBe(4.99)"
+          },
+          {
+            "type": "edge-case",
+            "location": "calculatePrice - undefined addons (lines 2-39)",
+            "priority": "high",
+            "reasoning": "The function is likely called without the addons parameter in many cases. This validates the function handles undefined gracefully without throwing an error.",
+            "suggestedTest": "calculatePrice handles undefined addons parameter - expect(calculatePrice('pro', undefined)).toBe(9.99)"
+          },
+          {
+            "type": "edge-case",
+            "location": "calculatePrice - unknown addons (lines 17-35)",
+            "priority": "medium",
+            "reasoning": "The code doesn't have an else branch for unknown addons, meaning they're silently ignored. This should be tested to document the expected behavior.",
+            "suggestedTest": "calculatePrice ignores unknown addon names - expect(calculatePrice('basic', ['unknown-addon'])).toBe(4.99)"
+          },
+          {
+            "type": "function",
+            "location": "upgradeSubscription - basic functionality (lines 41-49)",
+            "priority": "high",
+            "reasoning": "Tests the primary function output structure. This validates that the userId and plan are correctly passed through to the return object.",
+            "suggestedTest": "upgradeSubscription returns object with correct userId and plan - expect(upgradeSubscription('user123', 'pro', [])).toMatchObject({ userId: 'user123', plan: 'pro' })"
+          },
+          {
+            "type": "function",
+            "location": "upgradeSubscription - price calculation (line 42)",
+            "priority": "high",
+            "reasoning": "Tests the integration between upgradeSubscription and calculatePrice. Ensures the price calculation is delegated correctly.",
+            "suggestedTest": "upgradeSubscription calculates price using calculatePrice function - expect(upgradeSubscription('user123', 'basic', ['extra-storage']).price).toBe(7.49)"
+          },
+          {
+            "type": "edge-case",
+            "location": "upgradeSubscription - null addons (line 45)",
+            "priority": "high",
+            "reasoning": "Tests the || [] fallback. This is important for API consistency - callers expect addons to always be an array in the response.",
+            "suggestedTest": "upgradeSubscription defaults to empty array when addons is null - expect(upgradeSubscription('user123', 'basic', null).addons).toEqual([])"
+          },
+          {
+            "type": "function",
+            "location": "upgradeSubscription - timestamp (line 47)",
+            "priority": "high",
+            "reasoning": "Tests that the timestamp is generated and is in valid ISO format. Critical for audit trails and billing records.",
+            "suggestedTest": "upgradeSubscription includes upgradedAt timestamp in ISO format - expect(upgradeSubscription('user123', 'pro', []).upgradedAt).toMatch(/^\\d{4}-\\d{2}-\\d{2}T/)"
+          }
+        ],
+        "coverageEstimate": 0,
+        "summary": "The src/subscription.js file has ZERO test coverage - no test files exist for this module. The file exports two functions: calculatePrice (38 lines with multiple conditional branches) and upgradeSubscription (9 lines). calculatePrice contains 3 plan branches (basic/pro/enterprise), an else branch for invalid plans, and 2 addon branches each with 3 nested plan conditionals. This creates at least 15+ distinct code paths that are completely untested. The upgradeSubscription function integrates with calculatePrice and adds timestamp generation. Critical untested scenarios include: invalid plan handling (returns 0 silently), null/undefined addon handling, multi-addon combinations, and timestamp generation. Given the financial nature of subscription pricing, the lack of tests poses significant risk for billing errors."
+      },
+      "refactorings": {
+        "file": "src/subscription.js",
+        "suggestions": [
+          {
+            "type": "modernize",
+            "location": "Lines 5-15 (plan price calculation)",
+            "impact": "high",
+            "description": "Replace if-else chain with const object lookup (Strategy pattern). This eliminates branching complexity and makes adding new plans trivial.",
+            "before": "if (plan == 'basic') {\n  price = 4.99;\n} else if (plan == 'pro') {\n  price = 9.99;\n} else if (plan == 'enterprise') {\n  price = 29.99;\n} else {\n  price = 0;\n}",
+            "after": "const PLAN_PRICES = {\n  basic: 4.99,\n  pro: 9.99,\n  enterprise: 29.99\n};\n\nconst price = PLAN_PRICES[plan] ?? 0;",
+            "benefits": "Reduces cyclomatic complexity from 4 to 1, eliminates loose equality (==), makes plan prices declarative and easy to modify, enables type checking in TypeScript migration."
+          },
+          {
+            "type": "simplify",
+            "location": "Lines 17-32 (addon price logic)",
+            "impact": "high",
+            "description": "Extract duplicate addon pricing logic. Each addon currently has identical nested if-else chains that add the same price regardless of plan.",
+            "before": "if (addons && addons.includes('extra-storage')) {\n  if (plan == 'basic') {\n    price = price + 2.5;\n  } else if (plan == 'pro') {\n    price = price + 2.5;\n  }\n}",
+            "after": "const ADDON_PRICES = {\n  'extra-storage': 2.5,\n  'priority-support': 5\n};\n\nconst addonTotal = (addons ?? []).reduce((sum, addon) => {\n  return sum + (ADDON_PRICES[addon] ?? 0);\n}, 0);",
+            "benefits": "Eliminates 18 lines of redundant conditionals, makes addon prices configurable in one place, scales easily to new addons without code changes."
+          },
+          {
+            "type": "pattern-improvement",
+            "location": "Lines 2-37 (entire calculatePrice function)",
+            "impact": "high",
+            "description": "Refactor entire function to use declarative configuration-driven approach combining all previous suggestions.",
+            "before": "export function calculatePrice(plan, addons) {\n  let price = 0;\n  // 35 lines of nested if-else...\n  return price;\n}",
+            "after": "const PLAN_PRICES = { basic: 4.99, pro: 9.99, enterprise: 29.99 };\nconst ADDON_PRICES = { 'extra-storage': 2.5, 'priority-support': 5 };\n\nexport function calculatePrice(plan, addons = []) {\n  const basePrice = PLAN_PRICES[plan] ?? 0;\n  const addonTotal = addons.reduce((sum, addon) => sum + (ADDON_PRICES[addon] ?? 0), 0);\n  return basePrice + addonTotal;\n}",
+            "benefits": "Reduces function from 35 lines to 8 lines, eliminates all conditionals (cyclomatic complexity 1 vs 13), makes pricing configuration declarative and maintainable, easily extensible for new plans/addons."
+          },
+          {
+            "type": "modernize",
+            "location": "Lines 3, 17, 25 (variable declarations)",
+            "impact": "medium",
+            "description": "Replace 'let' with 'const' where variables are never reassigned after initialization. Use immutable updates instead of mutation.",
+            "before": "let price = 0;\nprice = price + 2.5;",
+            "after": "const basePrice = PLAN_PRICES[plan] ?? 0;\nconst storagePrice = addons?.includes('extra-storage') ? 2.5 : 0;\nconst price = basePrice + storagePrice + supportPrice;",
+            "benefits": "Eliminates mutation, makes data flow explicit, prevents accidental reassignment, improves readability."
+          },
+          {
+            "type": "modernize",
+            "location": "Lines 5-32 (loose equality)",
+            "impact": "medium",
+            "description": "Replace loose equality (==) with strict equality (===) throughout.",
+            "before": "if (plan == 'basic') {",
+            "after": "if (plan === 'basic') {",
+            "benefits": "Prevents unexpected type coercion, more predictable behavior, aligns with JavaScript best practices."
+          },
+          {
+            "type": "modernize",
+            "location": "Lines 39-47 (upgradeSubscription function)",
+            "impact": "low",
+            "description": "Use object shorthand property notation when key and variable names match.",
+            "before": "return {\n  userId: userId,\n  plan: plan,\n  addons: addons || [],\n  price: price\n};",
+            "after": "return {\n  userId,\n  plan,\n  addons: addons ?? [],\n  price\n};",
+            "benefits": "More concise, modern ES6 syntax. Also replaces || with ?? for more precise null/undefined handling."
+          }
+        ],
+        "summary": "Found 7 refactoring opportunities with 3 high-impact improvements. The most critical refactoring is replacing the nested if-else chains with declarative configuration objects (PLAN_PRICES and ADDON_PRICES), which would reduce the calculatePrice function from 35 lines to 8 lines and eliminate 12 conditional branches. The current implementation has significant duplication: each addon adds the same price regardless of plan type, yet requires 6 redundant conditionals. Modern JavaScript patterns (const, optional chaining, object lookup, reduce) would make this code more maintainable, testable, and extensible. Overall impact: reduces cyclomatic complexity from 13 to 1, eliminates 30+ lines of code, and makes pricing configuration data-driven rather than procedural."
+      }
+    }
+  ],
+  "summary": {
+    "totalFiles": 2,
+    "overallScore": 42,
+    "criticalIssues": 4,
+    "highPriorityTests": 22,
+    "refactoringOpportunities": 10
+  },
+  "recommendations": [
+    {
+      "priority": "critical",
+      "category": "Security - Authentication & Authorization",
+      "description": "The subscription upgrade endpoint has no authentication or authorization checks, allowing any user to potentially upgrade any userId to any plan. This is a severe security vulnerability that could lead to unauthorized access and financial loss.",
+      "files": [
+        "src/server.js"
+      ]
+    },
+    {
+      "priority": "critical",
+      "category": "Security - Input Validation",
+      "description": "Missing input validation on the subscription upgrade endpoint parameters (userId, plan, addons). This creates potential for injection attacks, type confusion, or privilege escalation. Both server.js and subscription.js lack proper parameter validation.",
+      "files": [
+        "src/server.js",
+        "src/subscription.js"
+      ]
+    },
+    {
+      "priority": "critical",
+      "category": "Testing - Zero Coverage",
+      "description": "Both files have 0% test coverage with no test files existing. This is especially critical for the subscription pricing logic which handles financial calculations. Billing errors could directly impact revenue and customer trust.",
+      "files": [
+        "src/server.js",
+        "src/subscription.js"
+      ]
+    },
+    {
+      "priority": "high",
+      "category": "Security - Infrastructure",
+      "description": "Missing essential security middleware including helmet.js (for security headers), CORS configuration, and rate limiting. The application is vulnerable to XSS, clickjacking, MIME sniffing, and DoS attacks.",
+      "files": [
+        "src/server.js"
+      ]
+    },
+    {
+      "priority": "high",
+      "category": "Code Quality - Maintainability",
+      "description": "Heavy code duplication and use of anti-patterns. The subscription.js file uses loose equality (==) instead of strict equality (===), has magic numbers scattered throughout, and contains 18 lines of redundant conditionals in addon pricing logic.",
+      "files": [
+        "src/subscription.js"
+      ]
+    },
+    {
+      "priority": "high",
+      "category": "Architecture - Error Handling",
+      "description": "Missing global error handling middleware in server.js. Unhandled errors will crash the server or leak error details to clients. Additionally, error responses are inconsistent across endpoints.",
+      "files": [
+        "src/server.js"
+      ]
+    },
+    {
+      "priority": "high",
+      "category": "Refactoring - Separation of Concerns",
+      "description": "Route handlers are inline anonymous functions mixing business logic with routing concerns. Extract into separate controller modules using Express Router pattern for better testability and maintainability.",
+      "files": [
+        "src/server.js"
+      ]
+    },
+    {
+      "priority": "medium",
+      "category": "Code Quality - Configuration",
+      "description": "Pricing values are hardcoded as magic numbers throughout subscription.js. Extract into a centralized configuration object (PLAN_PRICES, ADDON_PRICES) to make updates safer and enable dynamic pricing.",
+      "files": [
+        "src/subscription.js"
+      ]
+    },
+    {
+      "priority": "medium",
+      "category": "Testing - Business Logic",
+      "description": "The calculatePrice function has 15+ distinct code paths (plan tiers, addon combinations, edge cases) that are completely untested. Add comprehensive unit tests covering all branches, especially invalid plan handling which currently returns $0 silently.",
+      "files": [
+        "src/subscription.js"
+      ]
+    },
+    {
+      "priority": "medium",
+      "category": "Architecture - Testability",
+      "description": "Server startup logic is mixed with route definitions, making it difficult to test the app without starting the server. Separate into app.js (configuration) and server.js (startup) files.",
+      "files": [
+        "src/server.js"
+      ]
+    }
+  ],
+  "metadata": {
+    "analyzedAt": "2026-09-26T02:25:19.620Z",
+    "duration": 950073,
+    "agentVersions": {
+      "code-quality-analyzer": "1.0.0",
+      "test-coverage-analyzer": "1.0.0",
+      "refactoring-suggester": "1.0.0"
+    }
+  }
+}

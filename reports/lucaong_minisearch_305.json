@@ -1,0 +1,569 @@
+{
+  "pullRequest": {
+    "owner": "lucaong",
+    "repo": "minisearch",
+    "number": 305
+  },
+  "fileReviews": [
+    {
+      "file": "src/MiniSearch.ts",
+      "codeQuality": {
+        "file": "src/MiniSearch.ts",
+        "issues": [
+          {
+            "line": 1710,
+            "severity": "medium",
+            "category": "security",
+            "description": "Filter function bypasses applied at QueryCombination level without input validation. The filter function receives a result object that could be manipulated if attacker controls the query structure, potentially leading to prototype pollution through Object.assign operations.",
+            "suggestion": "Add input validation for the filter function return type. Ensure filter functions cannot modify the result object in unexpected ways. Consider Object.freeze() on result objects before passing to user-provided filter functions, or use a defensive copy."
+          },
+          {
+            "line": 1711,
+            "severity": "medium",
+            "category": "performance",
+            "description": "Calling makeResult() for every docurge result sets.",
+            "suggestion": "Consider applying filters at the RawResult level before creating full SearchResult objects, or implement lazy evaluation. Alternatively, restructure to create the result object only after filter passes."
+          },
+          {
+            "line": 1705,
+            "severity": "medium",
+            "category": "maintainability",
+            "description": "Setting filter to undefined explicitly in options destructuring is confusing. The code does: `const options = { ...searchOptions, filter: undefined, ...query, queries: undefined }`. This pattern overwrites searchOptions.filter with undefined before applying query properties, making the intent unclear.",
+            "suggestion": "Use explicit property exclusion or restructuring with better naming to clarify intent. Consider: `const { filter: queryFilter, queries, ...otherQueryOptions } = query; const options = { ...searchOptions, ...otherQueryOptions };` Then handle queryFilter separately to make the filter hierarchy explicit."
+          },
+          {
+            "line": 1959,
+            "severity": "high",
+            "category": "maintainability",
+            "description": "The new makeResult() method mixes concerns by both transforming data AND calculating derived values. The 'quality' calculation is buried in result creation, making it hard to understand scoring logic. Method signature shows it's extracting RawResultValue properties but the semantic meaning of this transformation is unclear.",
+            "suggestion": "Split this into two methods: one for pure result transformation and one for score calculation. Add JSDoc comments explaining the 'quality' multiplier."
+          },
+          {
+            "line": 1969,
+            "severity": "low",
+            "category": "performance",
+            "description": "Object.keys(match) is called to populate result.terms but this creates an intermediate array that's immediately assigned. For large match objects with many terms, this allocates unnecessary memory.",
+            "suggestion": "Consider using a more efficient approach if match objects are consistently large. However, for typical search results this is likely acceptable. If optimization is needed, you could cache the keys or use a different data structure."
+          },
+          {
+            "line": 1699,
+            "severity": "medium",
+            "category": "best-practice",
+            "description": "The executeQuery method has high cyclomatic complexity with three distinct code paths (wildcard, QueryCombination object, string query). This makes the method harder to test and understand. The nested structure for QueryCombination filtering adds another layer of complexity.",
+            "suggestion": "Extract each query type into its own method: executeWildcardQuery (already exists), executeQueryCombination, and executeStringQuery. This would improve readability and testability."
+          },
+          {
+            "line": 1386,
+            "severity": "medium",
+            "category": "maintainability",
+            "description": "The search method duplicates filter logic that's also in executeQuery. Both methods iterate over results and apply the filter function. This creates confusion about where filtering should happen and violates DRY principle.",
+            "suggestion": "Consolidate filter application to one location. Since executeQuery now handles QueryCombination-level filters, consider removing the top-level filter application in search() or clearly document why both are needed."
+          },
+          {
+            "line": 1964,
+            "severity": "low",
+            "category": "best-practice",
+            "description": "Using 'quality' as a variable name is vague. The calculation `terms.length || 1` represents the number of matched query terms used as a score multiplier, but 'quality' doesn't clearly convey this meaning.",
+            "suggestion": "Rename to 'matchedTermsMultiplier' or 'termCountFactor' with a comment explaining that more matched terms indicate better relevance."
+          },
+          {
+            "line": 1974,
+            "severity": "low",
+            "category": "security",
+            "description": "Object.assign is used to merge stored fields into the result object. If stored fields contain __proto__ or constructor properties, this could lead to prototype pollution. While the stored fields come from internal storage, they originate from user documents added to the index.",
+            "suggestion": "Use a safer merge approach that explicitly excludes dangerous property names, or use Object.defineProperty with explicit enumeration."
+          },
+          {
+            "line": 1706,
+            "severity": "low",
+            "category": "maintainability",
+            "description": "The code maps subqueries and combines results without handling potential errors from recursive executeQuery calls. If a malformed subquery is deep in the tree, the error context is lost.",
+            "suggestion": "Add error handling with context information to indicate which subquery index failed during recursive execution."
+          }
+        ],
+        "overallScore": 72,
+        "summary": "The PR #305 changes add filtering support for QueryCombination queries by introducing a makeResult() helper method and modifying executeQuery(). The implementation is functionally correct but has several quality concerns: (1) Performance issue where SearchResult objects are created for all documents before filtering, wasteful for large result sets with selective filters. (2) Maintainability concerns with confusing options destructuring pattern and makeResult() method mixing multiple concerns. (3) Code duplication with filter logic appearing in both search() and executeQuery(). (4) Minor security risk from Object.assign with user-controlled data. The code properly maintains TypeScript types and the recursive query execution is well-structured."
+      },
+      "testCoverage": {
+        "file": "src/MiniSearch.ts",
+        "hasTests": true,
+        "testFiles": [
+          "src/MiniSearch.test.js"
+        ],
+        "untestedPaths": [
+          {
+            "type": "function",
+            "location": "executeQuery (complex query with nested sub-queries), lines 1704-1718",
+            "priority": "high",
+            "reasoning": "The existing test only tests filters on 2-level queries. Deep nesting (3+ levels) with filters at multiple levels could expose bugs in filter cascading or filter=undefined logic.",
+            "suggestedTest": "should apply filter at each nested level of a deeply nested query tree with assertion: expect(results.filter(r => r.category === 'poetry')).toHaveLength(expectedCount) for a query with 3+ levels of nesting with different filters at each level"
+          },
+          {
+            "type": "edge-case",
+            "location": "executeQuery (filter on empty result set), lines 1710-1714",
+            "priority": "medium",
+            "reasoning": "When combined.size === 0, the filter loop is never executed. This edge case should be tested to ensure no errors occur and an empty array is returned correctly.",
+            "suggestedTest": "should handle filter function when combined results are empty with assertion: expect(ms.search({ combineWith: 'AND', queries: ['nonexistent', 'terms'], filter: () => true })).toEqual([])"
+          },
+          {
+            "type": "edge-case",
+            "location": "executeQuery (filter that throws error), lines 1710-1714",
+            "priority": "high",
+            "reasoning": "Error handling for filter functions is critical. If a filter throws, it should propagate properly without corrupting the results Map.",
+            "suggestedTest": "should propagate error when filter function throws during sub-query filtering with assertion: expect(() => ms.search({ queries: ['vita'], filter: () => { throw new Error('filter error') } })).toThrow('filter error')"
+          },
+          {
+            "type": "edge-case",
+            "location": "executeQuery (filter returning non-boolean), line 1713",
+            "priority": "medium",
+            "reasoning": "Line 1713 uses !options.filter(result) which relies on JavaScript truthiness. Tests should verify behavior when filter returns 0, '', null, undefined, or objects.",
+            "suggestedTest": "should treat truthy/falsy non-boolean filter return values correctly in sub-queries with appropriate assertions for edge cases"
+          },
+          {
+            "type": "function",
+            "location": "makeResult, lines 1959-1977",
+            "priority": "critical",
+            "reasoning": "makeResult is a new private method. Line 1964 sets quality = terms.length || 1, which means empty terms defaults to quality=1. This affects score calculation and is untested.",
+            "suggestedTest": "should construct result with correct queryTerms when terms array is empty with assertion verifying score calculation with quality=1"
+          },
+          {
+            "type": "edge-case",
+            "location": "makeResult (stored field collision), line 1974",
+            "priority": "medium",
+            "reasoning": "Object.assign merges stored fields into result, which could overwrite result.id, result.score, result.match, etc. Tests should verify that core SearchResult properties are not corrupted.",
+            "suggestedTest": "should handle collision when stored field name conflicts with SearchResult properties and verify core properties are not overwritten"
+          },
+          {
+            "type": "function",
+            "location": "makeResult (called from search), line 1387",
+            "priority": "high",
+            "reasoning": "Lines 1386-1390 show makeResult is called before the filter. Tests should verify the call order and that filters receive fully-constructed results with stored fields.",
+            "suggestedTest": "should call makeResult for each raw result before applying top-level filter with spy verification of call order"
+          },
+          {
+            "type": "edge-case",
+            "location": "executeQuery (sub-query with filter=undefined inheritance), line 1705",
+            "priority": "high",
+            "reasoning": "Line 1705 explicitly sets filter: undefined, preventing filter inheritance from searchOptions. This is critical behavior for sub-query isolation but untested.",
+            "suggestedTest": "should not inherit parent filter when sub-query explicitly sets filter to undefined"
+          },
+          {
+            "type": "branch",
+            "location": "executeQuery (sub-query filter vs top-level filter interaction), lines 1386-1390 and 1710-1714",
+            "priority": "critical",
+            "reasoning": "Sub-query filters are applied at one level, then top-level filters at another. This two-stage filtering is complex and untested.",
+            "suggestedTest": "should apply both sub-query filter and top-level filter correctly with verification that both filters are called and affect final results"
+          },
+          {
+            "type": "edge-case",
+            "location": "executeQuery (combined results Map mutation during filtering), lines 1711-1714",
+            "priority": "medium",
+            "reasoning": "Line 1713 deletes from the Map while iterating over it. Tests should verify that deleting entries during iteration doesn't skip or double-process entries.",
+            "suggestedTest": "should safely delete entries from combined Map while iterating with verification of correct filtering"
+          },
+          {
+            "type": "branch",
+            "location": "executeQuery (filter with OR combination), lines 1710-1715",
+            "priority": "medium",
+            "reasoning": "When combineWith: OR, results from multiple sub-queries are merged, then filtered. Tests should verify filters work correctly on merged results.",
+            "suggestedTest": "should apply filter correctly after OR combination merges results"
+          },
+          {
+            "type": "branch",
+            "location": "executeQuery (filter with AND_NOT combination), lines 1710-1715",
+            "priority": "medium",
+            "reasoning": "AND_NOT removes documents, then filter is applied. Tests should verify filtering happens after AND_NOT exclusion to ensure correct precedence.",
+            "suggestedTest": "should apply filter after AND_NOT excludes documents with correct precedence verification"
+          }
+        ],
+        "coverageEstimate": 45,
+        "summary": "The test suite has basic coverage for simple filter usage and basic complex query filtering, but lacks comprehensive testing for the new PR #305 functionality. Critical gaps include: (1) The new makeResult private method has no direct tests - only exercised indirectly. Edge cases like empty terms arrays or stored field collisions are untested. (2) The sub-query filtering logic lacks tests for nested queries beyond 2 levels, error handling in filters, filter inheritance with filter=undefined, and interaction between sub-query and top-level filters. (3) No tests verify Map mutation safety during filtering iteration. (4) No tests cover non-boolean filter return values or filter behavior with AND_NOT/OR combinations after result merging. Priority: Test the interaction between sub-query and top-level filters (critical), makeResult with empty terms (critical), and filter error handling (high) first."
+      },
+      "refactorings": {
+        "file": "src/MiniSearch.ts",
+        "suggestions": [
+          {
+            "type": "extract-function",
+            "location": "executeQuery method, lines 1704-1718",
+            "impact": "high",
+            "description": "The QueryCombination execution logic in executeQuery mixes option merging, subquery execution, result combination, and filtering. Extract the QueryCombination handling into a dedicated method like executeQueryCombination for better separation of concerns.",
+            "before": "if (typeof query !== 'string') {\n  const options = { ...searchOptions, filter: undefined, ...query, queries: undefined }\n  const results = query.queries.map((subquery) => this.executeQuery(subquery, options))\n  const combined = this.combineResults(results, options.combineWith)\n  if (options.filter) {\n    for (const [docId, rawValue] of combined) {\n      const result = this.makeResult(docId, rawValue)\n      if (!options.filter(result)) combined.delete(docId)\n    }\n  }\n  return combined\n}",
+            "after": "if (typeof query !== 'string') {\n  return this.executeQueryCombination(query, searchOptions)\n}\n\nprivate executeQueryCombination(query: QueryCombination, searchOptions: SearchOptions): RawResult {\n  const options = { ...searchOptions, filter: undefined, ...query, queries: undefined }\n  const results = query.queries.map((subquery) => this.executeQuery(subquery, options))\n  const combined = this.combineResults(results, options.combineWith)\n  return this.applyFilterToRawResults(combined, options.filter)\n}",
+            "benefits": "Improves readability and testability by isolating QueryCombination logic. Makes the executeQuery method easier to understand by reducing cyclomatic complexity. Enables focused unit testing of QueryCombination execution."
+          },
+          {
+            "type": "extract-function",
+            "location": "Filter application logic, lines 1710-1715",
+            "impact": "medium",
+            "description": "The filter application logic that converts RawResult to SearchResult for filtering is repeated conceptually in the search method (lines 1386-1391). Extract this pattern into a reusable method applyFilterToRawResults.",
+            "before": "if (options.filter) {\n  for (const [docId, rawValue] of combined) {\n    const result = this.makeResult(docId, rawValue)\n    if (!options.filter(result)) combined.delete(docId)\n  }\n}",
+            "after": "private applyFilterToRawResults(rawResults: RawResult, filter?: (result: SearchResult) => boolean): RawResult {\n  if (filter == null) return rawResults\n  for (const [docId, rawValue] of rawResults) {\n    const result = this.makeResult(docId, rawValue)\n    if (!filter(result)) rawResults.delete(docId)\n  }\n  return rawResults\n}",
+            "benefits": "Reduces code duplication and makes filter application logic reusable. Improves maintainability by consolidating filter logic in one place. Makes it easier to optimize filter application performance in the future."
+          },
+          {
+            "type": "simplify",
+            "location": "Options merging, line 1705",
+            "impact": "medium",
+            "description": "The options merging line spreads searchOptions, then spreads query properties while explicitly setting filter and queries to undefined. This is complex and error-prone. Use destructuring to separate filter and queries from query, then spread the rest for clarity.",
+            "before": "const options = { ...searchOptions, filter: undefined, ...query, queries: undefined }",
+            "after": "const { filter, queries, ...queryCombinationOptions } = query\nconst options = { ...searchOptions, ...queryCombinationOptions }",
+            "benefits": "Improves code clarity by making the intent explicit - extracting filter and queries from the query object. Reduces cognitive load by using destructuring instead of spread-override-spread pattern. Makes the code more maintainable and less error-prone."
+          },
+          {
+            "type": "modernize",
+            "location": "Search method result building, lines 1386-1391",
+            "impact": "low",
+            "description": "The search method uses a traditional for-loop with manual push to build the results array. Modernize to use Array.from with filter for a more functional approach.",
+            "before": "const results = []\nfor (const [docId, rawValue] of rawResults) {\n  const result = this.makeResult(docId, rawValue)\n  if (searchOptionsWithDefaults.filter == null || searchOptionsWithDefaults.filter(result)) {\n    results.push(result)\n  }\n}",
+            "after": "const results = Array.from(rawResults, ([docId, rawValue]) => this.makeResult(docId, rawValue))\n  .filter(result => searchOptionsWithDefaults.filter == null || searchOptionsWithDefaults.filter(result))",
+            "benefits": "More concise and declarative code using modern JavaScript patterns. Separates transformation (makeResult) from filtering concerns. Potentially easier to optimize with lazy evaluation in the future."
+          },
+          {
+            "type": "simplify",
+            "location": "makeResult method, lines 1959-1977",
+            "impact": "low",
+            "description": "The makeResult method directly mutates the result object with Object.assign for stored fields. Consider using spread syntax for immutability and clarity.",
+            "before": "const result: SearchResult = {\n  id: this._documentIds.get(docId),\n  score: score * quality,\n  terms: Object.keys(match),\n  queryTerms: terms,\n  match\n}\nObject.assign(result, this._storedFields.get(docId))\nreturn result",
+            "after": "return {\n  id: this._documentIds.get(docId),\n  score: score * quality,\n  terms: Object.keys(match),\n  queryTerms: terms,\n  match,\n  ...this._storedFields.get(docId)\n}",
+            "benefits": "Improves code clarity by using modern spread syntax. Makes the object construction more declarative and easier to read. Eliminates mutation of the result object for better functional programming style."
+          },
+          {
+            "type": "pattern-improvement",
+            "location": "executeQuery method, lines 1699-1730",
+            "impact": "medium",
+            "description": "The executeQuery method uses a series of type checks (wildcard, string, QueryCombination) to branch execution. Consider implementing a Strategy  with separate executor classes for each query type to reduce cyclomatic complexity and improve testability.",
+            "before": "private executeQuery (query: Query, searchOptions: SearchOptions = {}): RawResult {\n  if (query === MiniSearch.wildcard) {\n    return this.executeWildcardQuery(searchOptions)\n  }\n  if (typeof query !== 'string') {\n    // QueryCombination logic\n  }\n  // String query logic\n}",
+            "after": "// Define executor interface and implement WildcardQueryExecutor, CombinationQueryExecutor, StringQueryExecutor classes\nfor (const executor of this._queryExecutors) {\n  if (executor.canHandle(query)) {\n    return executor.execute(query, searchOptions)\n  }\n}",
+            "benefits": "Reduces cyclomatic complexity of executeQuery method. Improves testability by allowing each query type to be tested in isolation. Makes it easier to add new query types in the future without modifying executeQuery. Follows Open/Closed Principle."
+          }
+        ],
+        "summary": "The PR #305 changes introduce filtering support for QueryCombination which works correctly but adds complexity to the executeQuery method. Key refactoring opportunities include: (1) extracting the QueryCombination execution into a dedicated method to improve readability and testability (high impact), (2) creating a reusable filter application method to reduce duplication (medium impact), (3) simplifying option merging with destructuring instead of spread-then-override patterns (medium impact), (4) modernizing array construction in the search method (low impact), and (5) using spread syntax in makeResult for cleaner object construction (low impact). Consider implementing a Strategy pattern for query execution if additional query types will be added in the future."
+      }
+    },
+    {
+      "file": "src/MiniSearch.test.js",
+      "codeQuality": {
+        "file": "src/MiniSearch.test.js",
+        "issues": [
+          {
+            "line": 1259,
+            "severity": "medium",
+            "category": "maintainability",
+            "description": "Destructuring parameter without defensive checks. The filter function assumes 'category' field will always exist on the result object.",
+            "suggestion": "Consider adding optional chaining or defensive checks: filter: ({ category } = {}) => category === 'poetry' or filter: (result) => result?.category === 'poetry'. This prevents potential errors if the stored fields configuration changes."
+          },
+          {
+            "line": 1263,
+            "severity": "medium",
+            "category": "maintainability",
+            "description": "Duplicate destructuring pattern without defensive checks. Same issue as line 1259 - assumes 'category' field exists.",
+            "suggestion": "Apply the same defensive pattern consistently: filter: ({ category } = {}) => category === 'fiction' or use optional chaining for safer property access."
+          },
+          {
+            "line": 1267,
+            "severity": "low",
+            "category": "maintainability",
+            "description": "Test assertion relies on implicit array ordering from .sort() without explicitly verifying the sorting behavior.",
+            "suggestion": "While the test is correct, consider adding a comment explaining why .sort() is needed, or use a more explicit assertion pattern. This makes the test intent clearer for future maintainers."
+          },
+          {
+            "line": 1254,
+            "severity": "low",
+            "category": "best-practice",
+            "description": "Test case doesn't verify that results from different sub-queries are actually distinct documents. It only checks the category values match expectations.",
+            "suggestion": "Consider adding an assertion to verify document IDs are as expected: expect(results.map(({ id }) => id).sort()).toEqual([expected, ids]). This would make the test more robust and clearly document the expected behavior."
+          },
+          {
+            "line": 1248,
+            "severity": "low",
+            "category": "maintainability",
+            "description": "Similar destructuring pattern in existing test (line 1248) also lacks defensive checks for consistency with the new test.",
+            "suggestion": "For consistency across the test suite, apply the same defensive pattern if added to the new test: filter: ({ category } = {}) => category === 'poetry'."
+          },
+          {
+            "line": 1256,
+            "severity": "low",
+            "category": "best-practice",
+            "description": "Nested 'queries' structure (queries within queries) could be confusing without additional documentation or a descriptive comment.",
+            "suggestion": "Add a comment explaining the nested query structure: // Test complex query with sub-queries, each with different filters. This improves readability and test maintainability."
+          }
+        ],
+        "overallScore": 85,
+        "summary": "The new test case at lines 1254-1269 is well-structured and follows the existing test patterns in the file. It correctly tests the custom filtering feature for complex queries using proper Jest assertions. The code uses modern JavaScript (const, arrow functions, destructuring) consistently. No security vulnerabilities or performance issues were identified - this is appropriate for a test file. The main concerns are around maintainability: (1) destructuring parameters without defensive checks could lead to unclear errors if test data changes, (2) the test could be more explicit about verifying document IDs in addition to categories, and (3) the nested query structure might benefit from a clarifying comment. The 'let' to 'const' changes mentioned in the PR description appear to have already been applied throughout the file, which is a positive improvement for immutability and code clarity. Overall, this is solid test code with minor opportunities for defensive programming improvements."
+      },
+      "testCoverage": {
+        "file": "src/MiniSearch.test.js",
+        "hasTests": true,
+        "testFiles": [
+          "src/MiniSearch.test.js"
+        ],
+        "untestedPaths": [
+          {
+            "type": "edge-case",
+            "location": "Complex query filtering - empty results, lines 1254-1269",
+            "priority": "critical",
+            "reasoning": "The current test assumes both subqueries return results. If one filter excludes all results, the complex query should still work correctly and return only results from the other subquery. This is a critical path for real-world usage where filters may be very restrictive.",
+            "suggestedTest": "should handle filters that exclude all results from a subquery with assertion: expect(results.length).toBe(1) and expect results to only include the subquery that matched"
+          },
+          {
+            "type": "edge-case",
+            "location": "Complex query filtering - all filters reject, lines 1254-1269",
+            "priority": "critical",
+            "reasoning": "When all subquery filters exclude all matching documents, the complex query should return an empty array without errors. This tests the empty result path which is a common edge case in filtering scenarios.",
+            "suggestedTest": "should handle filters that return false for all documents in all subqueries with assertion: expect(results).toEqual([])"
+          },
+          {
+            "type": "branch",
+            "location": "Complex query filtering with combineWith operators, lines 1254-1269",
+            "priority": "high",
+            "reasoning": "The test doesn't verify how filters interact with different combineWith operators (OR, AND, AND_NOT). Filters could behave differently when combining results with AND vs OR, especially when a document matches multiple subqueries but is filtered out in one.",
+            "suggestedTest": "should apply combineWith operators correctly with per-subquery filters with verification of different behavior for AND, OR, and AND_NOT"
+          },
+          {
+            "type": "edge-case",
+            "location": "Filter on undefined fields, lines 1254-1269",
+            "priority": "high",
+            "reasoning": "Document id:1 has no category field (undefined). The test should verify that filtering on undefined fields doesn't cause errors and that the filter function receives undefined correctly. This is a common real-world scenario.",
+            "suggestedTest": "should handle undefined or missing filter property gracefully with appropriate error handling verification"
+          },
+          {
+            "type": "branch",
+            "location": "Global filter + subquery filters interaction, lines 1254-1269",
+            "priority": "high",
+            "reasoning": "The test doesn't verify what happens when a filter is provided at the top level AND at the subquery level. This interaction pattern is critical for understanding filter precedence and combination behavior.",
+            "suggestedTest": "should combine global filter with per-subquery filters correctly with verification that both filters apply (logical AND of filters)"
+          },
+          {
+            "type": "branch",
+            "location": "Filter override from default searchOptions, lines 1271-1284",
+            "priority": "high",
+            "reasoning": "If a default filter is set in searchOptions, it's unclear whether subquery-level filters override or combine with it. This is critical for understanding filter precedence.",
+            "suggestedTest": "should handle filter override from default searchOptions with verification of precedence behavior"
+          },
+          {
+            "type": "edge-case",
+            "location": "Filter function parameter structure, lines 1254-1269",
+            "priority": "medium",
+            "reasoning": "The test doesn't verify what properties are available to the filter function. It should confirm that filters receive the full result object including all stored fields.",
+            "suggestedTest": "should verify filter receives correct document shape with all stored fields including score, match, and all storeFields"
+          },
+          {
+            "type": "branch",
+            "location": "Fuzzy search with complex query filters, lines 1254-1269",
+            "priority": "medium",
+            "reasoning": "The test doesn't verify filter interaction with fuzzy search. Since fuzzy search may match more documents, it's important to ensure filters are applied after fuzzy matching completes.",
+            "suggestedTest": "should apply filters correctly with fuzzy search in subqueries"
+          },
+          {
+            "type": "branch",
+            "location": "Prefix search with complex query filters, lines 1254-1269",
+            "priority": "medium",
+            "reasoning": "Similar to fuzzy search, prefix search changes the matching behavior. Filters should be tested with prefix search to ensure they work correctly with this search mode.",
+            "suggestedTest": "should apply filters correctly with prefix search in subqueries"
+          },
+          {
+            "type": "edge-case",
+            "location": "Score ordering after filtering, lines 1254-1269",
+            "priority": "medium",
+            "reasoning": "The test verifies result count and categories but doesn't verify that filtering maintains proper score ordering. Scores should remain in descending order after filtering.",
+            "suggestedTest": "should preserve score ordering after filtering in complex queries with assertion verifying descending score order"
+          },
+          {
+            "type": "function",
+            "location": "Deeply nested complex queries, lines 1254-1269",
+            "priority": "medium",
+            "reasoning": "The test only uses 2-level nesting. Deeper nesting with filters at multiple levels could expose cascading or precedence issues.",
+            "suggestedTest": "should apply filters with nested complex queries (3+ levels deep) with verification of filter application at all levels"
+          },
+          {
+            "type": "edge-case",
+            "location": "Filter function error handling, lines 1254-1269",
+            "priority": "low",
+            "reasoning": "If a user-provided filter function throws an error, the behavior should be predictable. This tests error handling in the filtering path.",
+            "suggestedTest": "should handle filter function that throws an error with appropriate error propagation or handling"
+          }
+        ],
+        "coverageEstimate": 40,
+        "summary": "The new test case for custom filtering in complex queries (PR #305) provides basic validation of the feature but lacks comprehensive coverage. It successfully tests the happy path where two subqueries each have filters that return results, and verifies the correct documents are returned based on their categories. Key gaps include: (1) No edge case testing for empty results, undefined fields, and restrictive filters. (2) No integration testing with other query options (combineWith: AND/AND_NOT, fuzzy, prefix, boost). (3) No filter precedence testing - unclear how subquery filters interact with global filters or default searchOptions. (4) No error handling verification when filters throw errors or receive unexpected data. (5) Limited assertions - only checks result length and categories, not scores, match data, or other result properties. The test data is well-structured with documents having varied category values, providing opportunities for edge case testing that aren't being utilized. Priority: Add tests for empty filter results and filter interaction with combineWith operators (both critical), undefined field handling and filter override/combination (high priority)."
+      },
+      "refactorings": {
+        "file": "src/MiniSearch.test.js",
+        "suggestions": [
+          {
+            "type": "extract-function",
+            "location": "ID extraction pattern, multiple locations throughout file",
+            "impact": "high",
+            "description": "Extract repeated pattern 'results.map(({ id }) => id)' into a helper function. This pattern appears 17+ times throughout the test file, creating significant duplication.",
+            "before": "expect(results.map(({ id }) => id).sort()).toEqual([1])\nexpect(results.map(({ id }) => id)).toEqual([2, 3])",
+            "after": "const extractIds = (results) => results.map(({ id }) => id)\nexpect(extractIds(results).sort()).toEqual([1])\nexpect(extractIds(results)).toEqual([2, 3])",
+            "benefits": "Reduces code duplication across 17+ instances. Improves test maintainability by centralizing the ID extraction logic. Makes tests more readable and easier to update if the extraction pattern needs to change."
+          },
+          {
+            "type": "pattern-improvement",
+            "location": "Filter tests organization, lines 1246-1284",
+            "impact": "medium",
+            "description": "Group related filter tests into a nested describe block. The three consecutive filter tests test similar functionality and should be organized together for better test discoverability.",
+            "before": "describe('search', () => {\n  it('allows custom filtering of results on the basis of stored fields', () => {...})\n  it('allows custom filtering of results in complex queries', () => {...})\n  it('allows to define a default filter upon instantiation', () => {...})\n})",
+            "after": "describe('search', () => {\n  describe('filtering', () => {\n    it('allows custom filtering of results on the basis of stored fields', () => {...})\n    it('allows custom filtering in complex queries', () => {...})\n    it('allows defining a default filter upon instantiation', () => {...})\n  })\n})",
+            "benefits": "Improves test organization and discoverability. Makes it easier to find all filter-related tests. Provides better test output structure when running tests. Enables shared setup/teardown for filter tests if needed."
+          },
+          {
+            "type": "extract-function",
+            "location": "Category extraction pattern, multiple locations",
+            "impact": "medium",
+            "description": "Extract repeated category extraction pattern into a helper. The pattern 'results.map(({ category }) => category)' appears multiple times and could be abstracted.",
+            "before": "expect(results.map(({ category }) => category).sort()).toEqual(['fiction', 'poetry', undefined])",
+            "after": "const extractCategories = (results) => results.map(({ category }) => category)\nexpect(extractCategories(results).sort()).toEqual(['fiction', 'poetry', undefined])",
+            "benefits": "Reduces duplication of category extraction logic. Improves consistency across tests that check category values. Makes the test intent clearer by using a named helper function."
+          },
+          {
+            "type": "modernize",
+            "location": "Length assertions throughout file",
+            "impact": "medium",
+            "description": "Consistently use toHaveLength() instead of .length assertions throughout the search tests. Currently the file mixes 'expect(results.length).toBe()' and 'expect(results.length).toBeGreaterThan()' patterns.",
+            "before": "expect(results.length).toBeGreaterThan(0)\nexpect(results.length).toBe(2)",
+            "after": "expect(results).not.toHaveLength(0)\nexpect(results).toHaveLength(2)",
+            "benefits": "More semantic and provides better error messages with Jest. Improves consistency across the test suite. Follows Jest best practices for array length assertions."
+          },
+          {
+            "type": "extract-function",
+            "location": "Test document setup, multiple describe blocks",
+            "impact": "high",
+            "description": "Extract the test documents setup into a shared constant or beforeAll. The same 'documents' array is redeclared in multiple describe blocks throughout the file, creating duplication.",
+            "before": "describe('search', () => {\n  const documents = [...]\n  const ms = new MiniSearch({...})\n  ms.addAll(documents)\n})",
+            "after": "const testDocuments = { standard: [...] }\ndescribe('search', () => {\n  const documents = testDocuments.standard\n  const ms = new MiniSearch({...})\n  ms.addAll(documents)\n})",
+            "benefits": "Eliminates duplication of test document definitions across multiple describe blocks. Makes it easier to maintain and update test data. Improves consistency by ensuring all tests use the same document structure."
+          },
+          {
+            "type": "simplify",
+            "location": "Complex query test, lines 1254-1269",
+            "impact": "medium",
+            "description": "Extract inline filter arrow functions into named constants for better readability and reuse, especially since similar filters appear in multiple tests.",
+            "before": "const results = ms.search('del', {\n  filter: ({ category }) => category === 'poetry'\n})",
+            "after": "const poetryFilter = ({ category }) => category === 'poetry'\nconst fictionFilter = ({ category }) => category === 'fiction'\nconst results = ms.search('del', { filter: poetryFilter })",
+            "benefits": "Improves test readability by giving filters descriptive names. Enables reuse of common filter functions across multiple tests. Makes the test intent clearer and easier to understand at a glance."
+          },
+          {
+            "type": "simplify",
+            "location": "New complex query test assertions, lines 1267-1268",
+            "impact": "low",
+            "description": "The new test case can simplify its assertion. Instead of mapping categories and sorting, it could use more explicit assertions about the filter behavior.",
+            "before": "expect(results.length).toBe(2)\nexpect(results.map(({ category }) => category).sort()).toEqual(['fiction', 'poetry'])",
+            "after": "expect(results).toHaveLength(2)\nconst categories = results.map(({ category }) => category)\nexpect(categories).toContain('fiction')\nexpect(categories).toContain('poetry')",
+            "benefits": "More explicit about what's being tested. Provides better error messages when assertions fail. Makes the test less brittle to result ordering changes."
+          },
+          {
+            "type": "rename",
+            "location": "Sort call on expected array, line 1268",
+            "impact": "low",
+            "description": "The .sort() call on the expected array ['fiction', 'poetry'] is redundant since the array is already in alphabetical order. Use expect.arrayContaining for order-independent assertion.",
+            "before": "expect(results.map(({ category }) => category).sort()).toEqual(['fiction', 'poetry'])",
+            "after": "const categories = results.map(({ category }) => category)\nexpect(categories).toEqual(expect.arrayContaining(['fiction', 'poetry']))\nexpect(categories).toHaveLength(2)",
+            "benefits": "Removes redundant .sort() call. Makes the test less brittle to ordering changes. Uses Jest's built-in matchers for clearer intent."
+          }
+        ],
+        "summary": "Analyzed /tmp/MiniSearch.test.js focusing on PR #305 changes (new complex query filtering test at lines 1254-1269). Identified 8 refactoring opportunities: (1) Extract repeated ID/category mapping patterns into helper functions (high impact - reduces duplication across 17+ instances), (2) Extract duplicate test document arrays into shared constants (high impact), (3) Group related filter tests into nested describe block for better organization (medium impact), (4) Modernize length assertions to use Jest's toHaveLength matcher (medium impact), (5) Extract reusable filter functions as named constants (medium impact), (6) Simplify assertions in the new complex query test (low impact), and (7) Remove redundant .sort() call (low impact). The file shows good test coverage but suffers from significant duplication in assertion patterns and test data setup that could be streamlined."
+      }
+    }
+  ],
+  "summary": {
+    "totalFiles": 2,
+    "overallScore": 78.5,
+    "criticalIssues": 0,
+    "highPriorityTests": 9,
+    "refactoringOpportunities": 10
+  },
+  "recommendations": [
+    {
+      "priority": "critical",
+      "category": "Test Coverage",
+      "description": "Add comprehensive tests for the new makeResult() private method including edge cases like empty terms arrays and stored field name collisions with core SearchResult properties. The method is central to the PR's functionality but only tested indirectly.",
+      "files": [
+        "src/MiniSearch.ts",
+        "src/MiniSearch.test.js"
+      ]
+    },
+    {
+      "priority": "critical",
+      "category": "Test Coverage",
+      "description": "Test the interaction between sub-query filters and top-level filters. The two-stage filtering approach (filters at QueryCombination level and at search() level) is complex and currently untested, which could lead to unexpected behavior in production.",
+      "files": [
+        "src/MiniSearch.ts",
+        "src/MiniSearch.test.js"
+      ]
+    },
+    {
+      "priority": "high",
+      "category": "Performance",
+      "description": "Optimize filter execution to avoid creating SearchResult objects for documents that will be filtered out. Currently, makeResult() is called for every document before filtering, which is wasteful for large result sets with selective filters. Consider applying filters at the RawResult level or implementing lazy evaluation.",
+      "files": [
+        "src/MiniSearch.ts"
+      ]
+    },
+    {
+      "priority": "high",
+      "category": "Code Quality",
+      "description": "Refactor executeQuery method by extracting QueryCombination execution logic into a dedicated method (executeQueryCombination). This will reduce cyclomatic complexity, improve testability, and make the code easier to maintain.",
+      "files": [
+        "src/MiniSearch.ts"
+      ]
+    },
+    {
+      "priority": "high",
+      "category": "Test Coverage",
+      "description": "Add tests for error handling in filter functions. Verify behavior when filters throw errors, return non-boolean values, or receive undefined/null field values. This is critical for production robustness.",
+      "files": [
+        "src/MiniSearch.test.js"
+      ]
+    },
+    {
+      "priority": "high",
+      "category": "Test Coverage",
+      "description": "Test filter behavior with different combineWith operators (AND, OR, AND_NOT). Filters may behave differently when combining results, and this interaction is currently untested.",
+      "files": [
+        "src/MiniSearch.test.js"
+      ]
+    },
+    {
+      "priority": "medium",
+      "category": "Code Quality",
+      "description": "Simplify the options merging pattern in executeQuery (line 1705). Replace the confusing spread-override-spread pattern with explicit destructuring to make the intent clear and reduce cognitive load.",
+      "files": [
+        "src/MiniSearch.ts"
+      ]
+    },
+    {
+      "priority": "medium",
+      "category": "Code Quality",
+      "description": "Consolidate filter application logic. The filter logic appears in both search() and executeQuery(), creating duplication and confusion about where filtering should happen. Document the two-phase approach or consolidate to a single location.",
+      "files": [
+        "src/MiniSearch.ts"
+      ]
+    },
+    {
+      "priority": "medium",
+      "category": "Maintainability",
+      "description": "Extract repeated test patterns into helper functions. The test file has significant duplication with patterns like 'results.map(({ id }) => id)' appearing 17+ times. Create extractIds() and extractCategories() helpers to improve maintainability.",
+      "files": [
+        "src/MiniSearch.test.js"
+      ]
+    },
+    {
+      "priority": "low",
+      "category": "Security",
+      "description": "Add protection against prototype pollution in makeResult method. The Object.assign used to merge stored fields could be vulnerable if stored fields contain __proto__ or constructor properties. Use explicit property copying with safeguards.",
+      "files": [
+        "src/MiniSearch.ts"
+      ]
+    }
+  ],
+  "metadata": {
+    "analyzedAt": "2026-09-26T01:50:31.403Z",
+    "duration": 533525,
+    "agentVersions": {
+      "code-quality-analyzer": "1.0.0",
+      "test-coverage-analyzer": "1.0.0",
+      "refactoring-suggester": "1.0.0"
+    }
+  }
+}
